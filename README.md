@@ -36,7 +36,7 @@ Prepare your project directory with the following files:
 
 	Annotation and genome files for _Homo sapiens_ (GRCh38) are already included in CRAFT _input/_ directory; _Mus musculus_ (GRCm39) and _Drosophila melanogaster_ (BDGP6.32) files are downloadable from Github _input/_ directory. For other species, the gene annotation (in GTF format) and the genome sequence (in FASTA format) must be placed by the user into the _input/_ directory, contained in the project directory, and the _path_files.txt_ file must be updated consequently.
 
-- _params.txt_: file with the parameters to be setted in CRAFT. The file format is a text file with a/more parameter/s written in each row, in the following order:
+- _params.txt_: file with the parameters to be setted in CRAFT. The file format is a text file with a/more parameter/s written in each row, __in the following order__:
 
 	1. kind of prediction; it can be "M" for miRNA prediction, "R" for RBP prediction, "O" for ORF prediction, "MR", "MO", "RO" or "MRO" for a combination of the previous. The default kind of prediction is _MRO_.
 	2. investigated species; it can be one of the species in miRBase database: “hsa” for _Homo sapiens_ (default), “mmu” for _Mus musculus_, etc.;
@@ -77,16 +77,16 @@ and directory:
 
 - _input/_: directory containing the following files:
 
-	1. genome and annotation files (see before)
-	2. _mature_miRNA.txt_: file already included, containing all miRNA recognition elements (MRE) from miRBase; it is filtered based on the selected specie
-	3. _backsplice_gene_name.txt_: file with circRNA gene names. __It must be created by the user__. The file format is a tab-separated text file, with circRNA backsplice in the first column and circRNA host gene name in the second; the header is needed. An example of _backsplice_gene_name.txt_ is:
+	- genome and annotation files (see before)
+	- _mature_miRNA.txt_: file already included, containing all miRNA recognition elements (MRE) from miRBase; it is filtered based on the selected specie
+	- _backsplice_gene_name.txt_: file with circRNA gene names. __It must be created by the user__. The file format is a tab-separated text file, with circRNA backsplice in the first column and circRNA host gene name in the second; the header is needed. An example of _backsplice_gene_name.txt_ is:
 
 			circ_id	gene_names
 			4:143543509-143543972	SMARCA5
 			11:33286413-33287511	HIPK3
 			15:64499292-64500166	ZNF609
 
-	4. _AGO2_binding_sites.bed_ (optional): file with validated AGO2 binding sites. The file with human AGO2 binding sites (default) is included in Github _input/_ directory. For other species, the user must replace this file with its own AGO2 binding file in BED6 format. An example of _AGO2_binding_sites.bed_ is:
+	- _AGO2_binding_sites.bed_ (optional): file with validated AGO2 binding sites. The file with human AGO2 binding sites (default) is included in Github _input/_ directory. For other species, the user must replace this file with its own AGO2 binding file in BED6 format. An example of _AGO2_binding_sites.bed_ is:
 
 			4    143543521    143543542    AGO2_binding_site    .    +
 			4    143543530    143543559    AGO2_binding_site    .    +
@@ -117,8 +117,83 @@ After CRAFT successful run end, you will find the following new directories in y
 
 	The output files for the sequence reconstruction step are:
 	
-	1. _backsplice_sequence_1.fa_: file with the retrieved genomic sequence for each circRNA in FASTA format
-	2. _backsplice_sequence_1.txt_: tab-separated file with the retrieved genomic sequence for each circRNA in TXT format; the file appear with the circRNA backsplice coordinates in the first column and the sequence in the second
-	3. _backsplice_circRNA_length_1.txt_: tab-separated file with circRNA sequence length, with circRNA backsplice in the first column and circRNA length in the second
+	- _backsplice_sequence_1.fa_: file with the retrieved genomic sequence for each circRNA in FASTA format
+	- _backsplice_sequence_1.txt_: tab-separated file with the retrieved genomic sequence for each circRNA in TXT format; the file appear with the circRNA backsplice coordinates in the first column and the sequence in the second
+	- _backsplice_circRNA_length_1.txt_: tab-separated file with circRNA sequence length, with circRNA backsplice in the first column and circRNA length in the second
 
 	All these files are found in the _functional_predictions/_ directory.
+	
+- __functional_predictions/__
+
+	The output files of functional prediction step are (the final output of each tool is highlighted in bold):
+	
+	- _miRNA_detection/_:
+		- _backsplice_sequence_per_miRNA.fa_: the sequence used for miRNA prediction, obtained repeating the first 20 nt of the sequence at the end of each circRNA
+		- _miRanda/_:
+			- _output_miRanda.txt_: original output of miRanda
+			- _output_miRanda_c_per_R.txt_: output of miRanda (list of miRNA binding sites), not overlapping with AGO2 binding sites, if _AGO2_binding_sites.bed_ is provided, otherwise this file is missing
+			- __*output_miRanda_per_R.txt*__: final output of miRanda (list of miRNA binding sites), overlapping with AGO2 binding sites if _AGO2_binding_sites.bed_ is provided, otherwise it contains the list of miRNA binding sites not overlapping with AGO2 binding sites
+		- _PITA/_:
+			- _pred_pita_results.tab, pred_pita_results_targets.tab, pita.err, pita.log, pred_pita_results.gxp_: original output of PITA
+			- _pred_pita_results_targets_b.txt_: output for multiple sites
+			- _pred_pita_results_c.txt_: output of PITA (list of miRNA binding sites), not overlapping with AGO2 binding sites, if _AGO2_binding_sites.bed_ is provided, otherwise this file is missing
+			- __*pred_pita_results_per_R.txt*__: final output of PITA (list of miRNA binding sites), overlapping with AGO2 binding sites if _AGO2_binding_sites.bed_ is provided, otherwise it contains the list of miRNA binding sites not overlapping with AGO2 binding sites
+
+	- _RBP_detection/_:
+		- _backsplice_sequence_per_RBP.fa_: the sequence used for RBP prediction, obtained repeating the first 20 nt of the sequence at the end of each circRNA
+		- _beRBP/_:
+			- _analysis_RBP/_:
+				- _resultMatrix.tsv_: original output of beRBP
+				- _resultMatrix_b.tsv_: final output of beRBP in TSV (list of RBP binding sites)
+				- _resultMatrix_b.txt_: final output of beRBP in TXT (list of RBP binding sites)
+
+	- _ORF_detection/_:
+		- _backsplice_sequence_per_ORF_MIN_LENGTH.fa_: the sequence used for ORF prediction (with minimal length of the ORF = _MIN_LENGTH_), obtained doubling circRNA sequence twice
+		- _ORFfinder/_:
+			- _result_list_ORF_MIN_LENGTH.txt, result_list_CDS_MIN_LENGTH.txt, result_text_ORF_MIN_LENGTH.txt, result_table_ORF_MIN_LENGTH.txt, ORF0_MIN_LENGTH.log, ORF1_MIN_LENGTH.log, ORF2_MIN_LENGTH.log, ORF3_MIN_LENGTH.log, ORF0_MIN_LENGTH.perf, ORF1_MIN_LENGTH.perf, ORF2_MIN_LENGTH.perf, ORF3_MIN_LENGTH.perf_: original output of ORFfinder (with minimal length of the ORF = _MIN_LENGTH_)
+			- __*ORF_backsplice.txt*__ and __*ORF_backsplice0.txt*__: final output of ORFfinder (list of ORF detected), respectively with ORF start position in 1-based and in 0-based format
+			- __*ORF_backsplice_open.txt*__ and __*ORF_backsplice_open0.txt*__: final output of ORFfinder (list of rolling ORF detected), respectively with ORF start position in 1-based and in 0-based format
+			- __*result_list_CDS.fa*__ and _result_list_CDS.txt_: nucleotidic ORF sequence, respectively in FASTA and TXT format
+			- __*result_list_ORF.fa*__ and _result_list_ORF.txt_: amino acid ORF sequence, respectively in FASTA and TXT format
+
+- __graphical_output/__
+
+	The output files for the graphical output step are:
+
+	- _general/_: directory with the summary predictions of all circRNA analyzed:
+		- _functional_predictions_all_circRNAs.html_: output HTML file summarizing all predictions of all circRNA tested (see CRAFT paper for more details)
+		- single figures pulled out from the HTML file
+		- _All_validated_TGs.csv_: table pulled out from the HTML file; it can be loaded into Cytoscape for network analysis
+	- a directory for each single circRNA with it own predictions:
+		- _functional_predictions_CIRC_ID.html_: output HTML file with the predictions related to _CIRC_ID_ (see CRAFT paper for more details)
+		- single figures and tables pulled out from the HTML file
+
+
+### CircRNA sequence provided by the user
+
+If circRNA sequences are available to the user, CRAFT doesn’t perform the sequence reconstruction step. So, to let CRAFT use the provided circRNA sequences, the user must follow these steps:
+
+1. create the _sequence_extraction/_ directory into the project directory
+2. add the files _backsplice_sequence_1.fa_, _backsplice_sequence_1.txt_ and _backsplice_circRNA_length_1.txt_, in the format described above, to _sequence_extraction/_
+3. add the file _backsplice_gene_name.txt_, in the format described above, to _sequence_extraction/_
+4. if the user wants to filter for miRNA binding sites overlapped with AGO2 binding sites, he must also add the file _region_to_extract_1.bed_ to _sequence_extraction/_. The file in BED6 format must have six columns tab-separated: circRNA chromosome, 0-based start position, 1-based end position, backsplice coordinates, score, strand. Each row represents a single separated region from which the circRNA is arranged (exon, intron, part of exon/intron or intergenic region). An example of _region_to_extract_1.bed_ is:
+
+		11	33286412	33287511	11:33286412-33287511	.	+
+		15	64499291	64500166	15:64499291-64500166	.	+
+		4	143543508	143543657	4:143543508-143543972	.	+
+		4	143543852	143543972	4:143543508-143543972	.	+
+		
+		
+## Test your installation
+
+To test the installation or see an example of the whole analysis, prepare the project directory as detailed in the “Input data” section, and download the files included into the Github _test/_ directory and the _AGO2_binding_sites.bed_ file contained in the _input/_ directory. Then run:
+
+	sudo docker run -it -v $(pwd):/data adm/craft:v1.0
+	
+If CRAFT ran successfully, the resulting output will match with the output described above.
+	
+
+## Additional notes
+
+- Functional enrichments on validated target genes of miRNAs with predicted binding sites in circRNA sequences can be performed only for _Homo sapiens_ (hsa), _Mus musculus_ (mmu) and _Rattus norvegicus_ (rno) species.
+- The output clearness and intelligibility improve at the growing of filtering stringency; f.i., if a figure is not understandable or CRAFT crashes due to too many predictions, simply re-run the graphical part of the analysis increasing CRAFT stringency.
