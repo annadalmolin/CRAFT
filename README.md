@@ -34,7 +34,7 @@ Prepare your project directory with the following files:
 		../input/Homo_sapiens.GRCh38.dna.primary_assembly.fa
 		../input/mature_miRNA.txt
 
-Annotation and genome files for _Homo sapiens_ (GRCh38) are already included in CRAFT _input/_ directory; _Mus musculus_ (GRCm39) and _Drosophila melanogaster_ (BDGP6.32) files are downloadable from Github _input/_ directory. For other species, the gene annotation (in GTF format) and the genome sequence (in FASTA format) must be placed by the user into the _input/_ directory, contained in the project directory, and the _path_files.txt_ file must be updated consequently.
+	Annotation and genome files for _Homo sapiens_ (GRCh38) are already included in CRAFT _input/_ directory; _Mus musculus_ (GRCm39) and _Drosophila melanogaster_ (BDGP6.32) files are downloadable from Github _input/_ directory. For other species, the gene annotation (in GTF format) and the genome sequence (in FASTA format) must be placed by the user into the _input/_ directory, contained in the project directory, and the _path_files.txt_ file must be updated consequently.
 
 - _params.txt_: file with the parameters to be setted in CRAFT. The file format is a text file with a/more parameter/s written in each row, in the following order:
 
@@ -73,4 +73,52 @@ Annotation and genome files for _Homo sapiens_ (GRCh38) are already included in 
 		score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10
 		score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10, voteFrac_RBP=0.3
 
+and directory:
 
+- _input/_: directory containing the following files:
+
+	1. genome and annotation files (see before)
+	2. _mature_miRNA.txt_: file already included, containing all miRNA recognition elements (MRE) from miRBase; it is filtered based on the selected specie
+	3. _backsplice_gene_name.txt_: file with circRNA gene names. __It must be created by the user__. The file format is a tab-separated text file, with circRNA backsplice in the first column and circRNA host gene name in the second; the header is needed. An example of _backsplice_gene_name.txt_ is:
+
+			circ_id	gene_names
+			4:143543509-143543972	SMARCA5
+			11:33286413-33287511	HIPK3
+			15:64499292-64500166	ZNF609
+
+	4. _AGO2_binding_sites.bed_ (optional): file with validated AGO2 binding sites. The file with human AGO2 binding sites (default) is included in Github _input/_ directory. For other species, the user must replace this file with its own AGO2 binding file in BED6 format. An example of _AGO2_binding_sites.bed_ is:
+
+			4    143543521    143543542    AGO2_binding_site    .    +
+			4    143543530    143543559    AGO2_binding_site    .    +
+			4    143543562    143543607    AGO2_binding_site    .    +
+			
+
+### Running the analysis
+
+To run CRAFT from the Docker container use:
+
+	sudo docker run -it -v $(pwd):/data adm/craft::v1.0
+	
+All paths in _path_files.txt_ must be relative to the directory in the container where the volumes were mounted. (e.g. _../input/file_name_, as detailed above). 
+If you want the container to give your user permissions, you need to set the owner id with "-u `id -u`":
+
+	sudo docker run -u `id -u` -it -v $(pwd):/data adm/craft::v1.0
+
+
+### Output data
+
+After CRAFT successful run end, you will find the following new directories in your project directory:
+
+1. _sequence_extraction/_: contains intermediary files for the sequence reconstruction step
+2. _functional_predictions/_: contains final files of sequence reconstruction step and the three directories for miRNA, RBP and ORF predictions, respectively
+3. _graphical_output/_: contains the directory _general_ with the summary predictions of all circRNA analyzed, and a directory for each single circRNA with the specific investigation
+
+- __sequence_extraction/__
+
+	The output files for the sequence reconstruction step are:
+	
+	1. _backsplice_sequence_1.fa_: file with the retrieved genomic sequence for each circRNA in FASTA format
+	2. _backsplice_sequence_1.txt_: tab-separated file with the retrieved genomic sequence for each circRNA in TXT format; the file appear with the circRNA backsplice coordinates in the first column and the sequence in the second
+	3. _backsplice_circRNA_length_1.txt_: tab-separated file with circRNA sequence length, with circRNA backsplice in the first column and circRNA length in the second
+
+	All these files are found in the _functional_predictions/_ directory.
