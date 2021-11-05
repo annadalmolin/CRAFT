@@ -24,17 +24,18 @@ Prepare your project directory with the following files:
 
 - _path_files.txt_: file with the relative paths for annotation, genome and miRNA sequences files. The file format is a text file with a path written in each row, __in the following order__:
 
-	1. path to annotation file (in GTF format), to be written by the user
-	2. path to genome file (in FASTA format), to be written by the user
-	3. path to miRNA sequences file (in TXT format)
+	1. path to annotation file
+	2. path to genome file
+	3. path to miRNA sequences file
 
     An example of _path_files.txt_ is:
 	
-		../input/Homo_sapiens.GRCh38.93.gtf
+		../input/Homo_sapiens.GRCh38.104.gtf
 		../input/Homo_sapiens.GRCh38.dna.primary_assembly.fa
 		../input/mature_miRNA.txt
 
-	Annotation and genome files for _Homo sapiens_ (GRCh38) are already included in CRAFT _input/_ directory; _Mus musculus_ (GRCm39) and _Drosophila melanogaster_ (BDGP6.32) files are downloadable from Github _input/_ directory. For other species, the gene annotation (in GTF format) and the genome sequence (in FASTA format) must be placed by the user into the _input/_ directory, contained in the project directory, and the _path_files.txt_ file must be updated consequently.
+	The gene annotation (in GTF format) and the genome sequence (in FASTA format) files must be downloaded by the user and placed into the _input/_ directory contained in the project directory. Annotation and genome files for _Homo sapiens_ (GRCh38) can be downloaded from http://ftp.ensembl.org/pub/release-104/gtf/homo_sapiens/ and http://ftp.ensembl.org/pub/release-104/fasta/homo_sapiens/dna/, respectively.
+The miRNA sequences file was downloaded from miRBase and is already included in CRAFT _input/_ directory.
 
 - _params.txt_: file with the parameters to be setted in CRAFT. The file format is a text file with a/more parameter/s written in each row, __in the following order__:
 
