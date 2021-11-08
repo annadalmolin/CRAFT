@@ -39,8 +39,8 @@ The miRNA sequences file was downloaded from miRBase and is already included in 
 
 - _params.txt_: file with the parameters to be setted in CRAFT. The file format is a text file with a/more parameter/s written in each row, __in the following order__:
 
-	1. kind of prediction; it can be "M" for miRNA prediction, "R" for RBP prediction, "O" for ORF prediction, "MR", "MO", "RO" or "MRO" for a combination of the previous. The default kind of prediction is _MRO_.
-	2. investigated species; it can be one of the species in miRBase database: “hsa” for _Homo sapiens_ (default), “mmu” for _Mus musculus_, etc.;
+	1. kind of prediction; it can be "M" for miRNA prediction, "R" for RBP prediction, "O" for ORF prediction, "MR", "MO", "RO" or "MRO" for a combination of the previous.
+	2. investigated species; it can be one of the species in miRBase database: “hsa” for _Homo sapiens_, “mmu” for _Mus musculus_, etc.;
 	3. parameters for miRanda tool (optional); in a single row, they must be the _miRanda_score_ and the _miRanda_energy_, __in order__, separated by tab. The user must set or both parameters or neither of the two; default values are 80 (score) and -15 (energy).
 	4. parameters for beRBP tool (optional); in a single row, in order and separated by a tab, they must be the _PWM/s_ and the _RBP/s_ investigated. The syntax is: "PWM" "RBP"; multiple PWMs (separated by ", ") and associated RBP (separated by ", ") are also allowed. The default is _"all" "all"_, searching for all PWMs and RBPs included in beRBP database. The user must set or both parameters or neither of the two.
 	5. parameters for ORFfinder tool (optional); __in order__, separated by tab, the user must specify: the genetic code to use, the start codon to use, the minimal ORF length, whether to ignore nested ORFs and the strand in which putative ORFs are searched. The user must set all parameters or none of them. The allowed options for each parameter are:
