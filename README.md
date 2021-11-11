@@ -22,7 +22,7 @@ Prepare your project directory with the following files:
 		11:33286413-33287511	+
 		15:64499292-64500166	+
 
-- _path_files.txt_: file with the relative paths for annotation, genome and miRNA sequences files. The file format is a text file with a path written in each row, __in the following order__:
+- _path_files.txt_: file with the relative paths for Ensembl annotation and genome, and miRNA sequences files. The file format is a text file with a path written in each row, __in the following order__:
 
 	1. path to annotation file
 	2. path to genome file
@@ -34,7 +34,7 @@ Prepare your project directory with the following files:
 		../input/Homo_sapiens.GRCh38.dna.primary_assembly.fa
 		../input/mature_miRNA.txt
 
-	The gene annotation (in GTF format) and the genome sequence (in FASTA format) files must be downloaded by the user and placed into the _input/_ directory contained in the project directory. Annotation and genome files for _Homo sapiens_ (GRCh38) can be downloaded from http://ftp.ensembl.org/pub/release-104/gtf/homo_sapiens/ and http://ftp.ensembl.org/pub/release-104/fasta/homo_sapiens/dna/, respectively.
+	The gene annotation (in GTF format) and the genome sequence (in FASTA format) files must be downloaded by the user from Ensembl database and placed into the _input/_ directory contained in the project directory. Annotation and genome files for _Homo sapiens_ (GRCh38) can be downloaded from http://ftp.ensembl.org/pub/release-104/gtf/homo_sapiens/ and http://ftp.ensembl.org/pub/release-104/fasta/homo_sapiens/dna/, respectively.
 The miRNA sequences file was downloaded from miRBase and is already included in CRAFT _input/_ directory.
 
 - _params.txt_: file with the parameters to be setted in CRAFT. The file format is a text file with a/more parameter/s written in each row, __in the following order__:
@@ -42,17 +42,17 @@ The miRNA sequences file was downloaded from miRBase and is already included in 
 	1. kind of prediction; it can be "M" for miRNA prediction, "R" for RBP prediction, "O" for ORF prediction, "MR", "MO", "RO" or "MRO" for a combination of the previous.
 	2. investigated species; it can be one of the species in miRBase database: “hsa” for _Homo sapiens_, “mmu” for _Mus musculus_, etc.
 	3. parameters for miRanda tool (optional); in a single row, they must be the _miRanda_score_ and the _miRanda_energy_, __in order__, separated by tab. The user must set or both parameters or neither of the two; default values are 80 (score) and -15 (energy).
-	4. parameters for beRBP tool (optional); in a single row, in order and separated by a tab, they must be the _PWM/s_ and the _RBP/s_ investigated. The syntax is: "PWM" "RBP"; multiple PWMs (separated by ", ") and associated RBP (separated by ", ") are also allowed. The default is _"all" "all"_, searching for all PWMs and RBPs included in beRBP database. The user must set or both parameters or neither of the two.
-	5. parameters for ORFfinder tool (optional); __in order__, separated by tab, the user must specify: the genetic code to use, the start codon to use, the minimal ORF length, whether to ignore nested ORFs and the strand in which putative ORFs are searched. The user must set all parameters or none of them. The allowed options for each parameter are:
+	4. parameters for beRBP tool (optional); in a single row, in order and separated by a tab, they must be the _PWM/s_ and the _RBP/s_ investigated. The syntax is: "PWM" "RBP"; multiple PWMs (separated by ", ") and associated RBP (separated by ", ") are also allowed. The default is _"all" "all"_, searching for all PWMs and RBPs included in beRBP database. The user must set both parameters or none of the two.
+	5. prefix of the genome and indexes downloaded from UCSC website; f.i. _hg38_ for _Homo sapiens_. The human genome file can be downloaded from https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/ . Genome and indexes must be included in the _input/_ directory.
+	6. parameters for ORFfinder tool (optional); __in order__, separated by tab, the user must specify: the genetic code to use, the start codon to use, the minimal ORF length, whether to ignore nested ORFs and the strand in which putative ORFs are searched. The user must set all parameters or none of them. The allowed options for each parameter are:
 		1. genetic code: 1-31, see https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi for details; default: 1
 		2. start codon: 0 = "ATG" only, 1 = "ATG" and alternative initiation codons, 2 = any sense codon; default: 0
 		3. minimal ORF length (nt): allowed values are 30, 75, or 150; default: 30
 		4. ignore nested ORFs (ORF completely placed within another). allowed values are "TRUE" or "FALSE"; default: "FALSE"
 		5. strand (output ORFs on specified strand only): allowed values are "both", "plus" or "minus"; default: "plus"
-
-	6. parameters for the graphical output for a single circRNA investigated (optional, but advised); the default parameters are: _l=50000, QUANTILE1=”FALSE”, thr1=0.95, score_miRNA=120, energy_miRNA=-22, QUANTILE2=”FALSE”, thr2=0.95, dGduplex_miRNA=-20, dGopen_miRNA=-11, QUANTILE3=”FALSE”, thr3=0.9, voteFrac_RBP=0.15, orgdb="org.Hs.eg.db", meshdb="MeSH.Hsa.eg.db", symbol2eg="org.Hs.egSYMBOL2EG", eg2uniprot="org.Hs.egUNIPROT", org="hsapiens"_. The user must specify __only__ the parameters to be changed with respect to the default, in a comma-separated list format; the parameter order does not matter.
-	Available parameters:
 	
+	7. parameters for the graphical output for a single circRNA investigated (optional, but advised); the default parameters are: _l=50000, QUANTILE1=”FALSE”, thr1=0.95, score_miRNA=120, energy_miRNA=-22, QUANTILE2=”FALSE”, thr2=0.95, dGduplex_miRNA=-20, dGopen_miRNA=-11, QUANTILE3=”FALSE”, thr3=0.9, voteFrac_RBP=0.15, orgdb="org.Hs.eg.db", meshdb="MeSH.Hsa.eg.db", symbol2eg="org.Hs.egSYMBOL2EG", eg2uniprot="org.Hs.egUNIPROT", org="hsapiens"_. The user must specify __only__ the parameters to be changed with respect to the default, in a comma-separated list format; the parameter order does not matter.
+	Available parameters:
 		1. _l_: maximum length of circRNAs analyzed
 		2. QUANTILE: whether to filter predictions based on a quantile threshold (thr); _QUANTILE1_ and _thr1_ are set for miRanda predictions, _QUANTILE2_ and _thr2_ for PITA predictions, _QUANTILE3_ and _thr3_ for beRBP predictions
 		3. _score_miRNA_ and _energy_miRNA_: respectively, _score_ and _energy_ values of miRanda tool. Best predictions are obtained with higher _score_ and lower _energy_
@@ -62,7 +62,7 @@ The miRNA sequences file was downloaded from miRBase and is already included in 
 		7. _symbol2eg_ and _eg2uniprot_: databases for RBP enrichment analysis; the default values are for _Homo sapiens_
 		8. _org_: organism, in the form: human - ’hsapiens’, mouse - ’mmusculus’; the default value is for _Homo sapiens_
 
-	7. parameters for the summary graphical output for all circRNAs investigated (optional, but advised); the default parameters are the same as the previous point. The user must specify __only__ the parameters to be changed with respect to the default, in a comma-separated list format; the parameter order does not matter. Available parameters: the same as before, except for _meshdb_ and _org_. It is advised to set point 6 and point 7 parameters in the same way.
+	8. parameters for the summary graphical output for all circRNAs investigated (optional, but advised); the default parameters are the same as the previous point. The user must specify __only__ the parameters to be changed with respect to the default, in a comma-separated list format; the parameter order does not matter. Available parameters: the same as before, except for _meshdb_ and _org_. It is advised to set point 6 and point 7 parameters in the same way.
 
 	An example of _params.txt_ file is:
 
@@ -70,7 +70,8 @@ The miRNA sequences file was downloaded from miRBase and is already included in 
 		hsa
 
 
-
+		hg38
+		
 		score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10
 		score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10, voteFrac_RBP=0.3
 
@@ -78,16 +79,16 @@ and directory:
 
 - _input/_: directory containing the following files:
 
-	- genome and annotation files (see before)
-	- _mature_miRNA.txt_: file already included, containing all miRNA recognition elements (MRE) from miRBase; it is filtered based on the selected specie
-	- _backsplice_gene_name.txt_: file with circRNA gene names. __It must be created by the user__. The file format is a tab-separated text file, with circRNA backsplice in the first column and circRNA host gene name in the second; the header is needed. An example of _backsplice_gene_name.txt_ is:
+	- genome and annotation files from Ensembl database, genome and indexes files from UCSC databases (see before)
+	- _mature_miRNA.txt_: file already included in the directory, containing all miRNA recognition elements (MRE) from miRBase
+	- _backsplice_gene_name.txt_: file with circRNA gene names. __It must be created by the user__. The file format is a tab-separated text file, with circRNA backsplice in the first column and circRNA host gene name in the second; the official gene name has to be used. The header line is needed.  An example of _backsplice_gene_name.txt_ is:
 
 			circ_id	gene_names
 			4:143543509-143543972	SMARCA5
 			11:33286413-33287511	HIPK3
 			15:64499292-64500166	ZNF609
 
-	- _AGO2_binding_sites.bed_ (optional): file with validated AGO2 binding sites. The file with human AGO2 binding sites (default) is included in Github _input/_ directory. For other species, the user must replace this file with its own AGO2 binding file in BED6 format. An example of _AGO2_binding_sites.bed_ is:
+	- _AGO2_binding_sites.bed_ (optional): file with validated AGO2 binding sites. The file, in BED6 format, must have the following fields: chromosome, start genomic position (0-based), end genomic position, the string “AGO2_binding_site”, a dot, the strand. Keep attention to use the same genome reference version as that included in the _input/_ directory An example of _AGO2_binding_sites.bed_ is:
 
 			4    143543521    143543542    AGO2_binding_site    .    +
 			4    143543530    143543559    AGO2_binding_site    .    +
