@@ -62,7 +62,7 @@ The miRNA sequences file was downloaded from miRBase and is already included in 
 		7. _symbol2eg_ and _eg2uniprot_: databases for RBP enrichment analysis; the default values are for _Homo sapiens_
 		8. _org_: organism, in the form: human - ’hsapiens’, mouse - ’mmusculus’; the default value is for _Homo sapiens_
 
-	8. parameters for the summary graphical output for all circRNAs investigated (optional, but advised); the default parameters are the same as the previous point. The user must specify __only__ the parameters to be changed with respect to the default, in a comma-separated list format; the parameter order does not matter. Available parameters: the same as before, except for _meshdb_ and _org_. It is advised to set point 6 and point 7 parameters in the same way.
+	8. parameters for the summary graphical output for all circRNAs investigated (optional, but advised); the default parameters are the same as the previous point. The user must specify __only__ the parameters to be changed with respect to the default, in a comma-separated list format; the parameter order does not matter. Available parameters: the same as before, except for _meshdb_ and _org_. It is advised to set point 7 and point 8 parameters in the same way.
 
 	An example of _params.txt_ file is:
 
