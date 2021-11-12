@@ -183,15 +183,6 @@ If circRNA sequences are available to the user, CRAFT doesn’t perform the sequ
 		4	143543508	143543657	4:143543508-143543972	.	+
 		4	143543852	143543972	4:143543508-143543972	.	+
 		
-		
-## Test your installation
-
-To test the installation or see an example of the whole analysis, prepare the project directory as detailed in the “Input data” section, and download the files included into the Github _test/_ directory and the _AGO2_binding_sites.bed_ file contained in the _input/_ directory. Then run:
-
-	sudo docker run -it -v $(pwd):/data adm/craft:v1.0
-	
-If CRAFT ran successfully, the resulting output will match with the output described above.
-	
 
 ## Additional notes
 
