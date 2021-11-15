@@ -8,7 +8,7 @@ CRAFT is a computational pipeline that predicts circRNA sequence and molecular i
 
 The Docker image saves you from the installation burden. A Docker image of CRAFT is available from DockerHub; just pull it with the command:
 
-	docker pull adalmolin/CRAFT:v1.0
+	docker pull annadalmolin/craft:v1.0
 
 ## Usage
 
@@ -97,12 +97,12 @@ and directory:
 
 To run CRAFT from the Docker container use:
 
-	sudo docker run -it -v $(pwd):/data adm/craft::v1.0
+	sudo docker run -it -v $(pwd):/data annadalmolin/craft:v1.0
 	
 All paths in _path_files.txt_ must be relative to the directory in the container where the volumes were mounted (f.i. _/data/input/file_name_, as detailed above). 
 If you want the container to give your user permissions, you need to set the owner id with "-u `id -u`":
 
-	sudo docker run -u `id -u` -it -v $(pwd):/data adm/craft::v1.0
+	sudo docker run -u `id -u` -it -v $(pwd):/data annadalmolin/craft:v1.0
 
 
 ### Output data
