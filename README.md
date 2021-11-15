@@ -6,7 +6,7 @@ CRAFT is a computational pipeline that predicts circRNA sequence and molecular i
 
 ### Installation from the Docker image
 
-The Docker image saves you from the installation burden. A Docker image of CRAFT is available from DockerHub; just pull it with the command:
+The Docker image saves you from the installation burden. A Docker image of CRAFT is available from DockerHub at https://hub.docker.com/r/annadalmolin/craft; just pull it with the command:
 
 	docker pull annadalmolin/craft:v1.0
 
