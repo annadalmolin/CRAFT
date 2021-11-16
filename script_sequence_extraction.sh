@@ -306,10 +306,9 @@ fi
 ## 7) remove intermediary and empty files
 
 rm annotation*
-rm backsplice_int*
 rm backsplice_region_*
 rm backsplice_sequence_bed*
-rm circRNAs.*
+rm circRNAs*
 rm circ_id.txt
 rm circ_length.txt
 rm combined*
