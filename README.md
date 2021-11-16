@@ -76,7 +76,7 @@ and directory:
 
 - _input/_: directory containing the following files:
 
-	- genome and annotation files from Ensembl database, and genome and indexes files from UCSC databases (see before)
+	- genome and annotation files from Ensembl database, and genome and indexes files from UCSC databases (see above)
 	- _backsplice_gene_name.txt_: file with circRNA gene names. __It must be created by the user__. The file format is a tab-separated text file, with circRNA backsplice in the first column and circRNA host gene name in the second; the official gene name has to be used. The header line is needed.  An example of _backsplice_gene_name.txt_ is:
 
 			circ_id	gene_names
@@ -90,7 +90,7 @@ and directory:
 			4    143543530    143543559    AGO2_binding_site    .    +
 			4    143543562    143543607    AGO2_binding_site    .    +
 			
-   		The number of miRNA binding sites overlapped with AGO2 binding sites is written in the standard output. Check it in order to decide to keep AGO2 overlapping or re-running the analysis without this information (f.i. when very few sites are overlapping).
+   		The number of miRNA binding sites overlapped with AGO2 binding sites is written in the standard output. Check it in order to decide to keep AGO2 overlapping or re-running the analysis without this information (i.e. when very few sites are overlapping).
 			
 
 ### Running the analysis
@@ -111,7 +111,7 @@ After CRAFT successful run end, you will find the following new directories in y
 
 1. _sequence_extraction/_: contains intermediary files for the sequence reconstruction step
 2. _functional_predictions/_: contains final files of sequence reconstruction step and the three directories for miRNA, RBP and ORF predictions, respectively
-3. _graphical_output/_: contains the directory _general_ with the summary predictions of all circRNA analyzed, and a directory for each single circRNA with the specific investigation
+3. _graphical_output/_: contains the directory _general/_ with the summary predictions of all circRNA analyzed, and a directory for each single circRNA with the specific investigation
 
 - __sequence_extraction/__
 
@@ -176,7 +176,7 @@ If circRNA sequences are available to the user, CRAFT doesn’t perform the sequ
 1. create the _sequence_extraction/_ directory into the project directory
 2. add the _backsplice_sequence_1.fa_, _backsplice_sequence_1.txt_ and _backsplice_circRNA_length_1.txt_ files, in the format described above, to _sequence_extraction/_
 3. add the _backsplice_gene_name.txt_ file, in the format described above, to _sequence_extraction/_
-4. if the user wants to filter for miRNA binding sites overlapped with AGO2 binding sites, he/she must also add the file _region_to_extract_1.bed_ to _sequence_extraction/_. The file in BED6 format must have six columns tab-separated: circRNA chromosome, 0-based start position, 1-based end position, backsplice coordinates, score, strand. Each row represents a single separated region from which the circRNA is arranged (exon, intron, part of exon/intron or intergenic region). An example of _region_to_extract_1.bed_ is:
+4. if the user wants to filter for miRNA binding sites overlapped with AGO2 binding sites, he/she must also add the file _region_to_extract_1.bed_ to _sequence_extraction/_. The file in BED6 format must have six tab-separated columns: circRNA chromosome, 0-based start position, 1-based end position, backsplice coordinates, score, strand. Each row represents a single separated region from which the circRNA is arranged (exon, intron, part of exon/intron or intergenic region). An example of _region_to_extract_1.bed_ is:
 
 		11	33286412	33287511	11:33286412-33287511	.	+
 		15	64499291	64500166	15:64499291-64500166	.	+
