@@ -4,14 +4,14 @@
 
 ## input:
 # circRNA sequences file: "/data/backsplice_sequence_1.fa"
-# miRNA database: "/input/mature_$SPECIES.fa"
+# miRNA database: "/data/input/.mature_"$SPECIES".fa"
 # miRanda parameters: $SCORE, $ENERGY
 #	SCORE: best predictions are obtained with higher score
 #	ENERGY: best predictions are obtained with lower energy
 # AGO2 binding file (optional): "/data/input/AGO2_binding_sites.bed"
 # file of region positions for each circRNA (optional): "/data/sequence_extraction/region_to_extract_1.bed"
 
-## command: /scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+## command: /scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 
 
 
@@ -23,10 +23,10 @@ SEQUENCE="/data/sequence_extraction/region_to_extract_1.bed"
 mkdir /data/functional_predictions/miRNA_detection
 cd /data/functional_predictions/miRNA_detection
 
-cat /data/sequence_extraction/backsplice_sequence_1.fa | grep ">" > headers.txt
+cat ../backsplice_sequence_1.fa | grep ">" > headers.txt
 
-cat /data/sequence_extraction/backsplice_sequence_1.fa | grep -v ">" | cut -c1-20 > first_20_characters.txt
-cat /data/sequence_extraction/backsplice_sequence_1.fa | grep -v ">" > sequences.txt
+cat ../backsplice_sequence_1.fa | grep -v ">" | cut -c1-20 > first_20_characters.txt
+cat ../backsplice_sequence_1.fa | grep -v ">" > sequences.txt
 
 paste sequences.txt first_20_characters.txt | sed -e 's/\t//' > sequences_plus_first_20_characters.txt
 
