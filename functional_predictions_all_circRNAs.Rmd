@@ -36,54 +36,53 @@ params:
 
 ```{r setup, include=FALSE}
 
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, dpi = 600)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = TRUE, dpi = 600)
 
 ```
 
 ```{r libraries, echo=FALSE, include=FALSE}
 
-install.packages("BiocManager")
+.libPaths( c( '/data/.R/lib', .libPaths()) )
+
+# su "/usr/local/lib/R/site-library":
+
+library("knitr")
+
 library(BiocManager)
 
-BiocManager::install("dplyr")
-library(dplyr)
-BiocManager::install("tibble")
-library(tibble)
-BiocManager::install("data.table")
 library(data.table)
-BiocManager::install("ggplot2")
-library(ggplot2)
-BiocManager::install("pheatmap")
-library(pheatmap)
-BiocManager::install("RColorBrewer")
-library(RColorBrewer)
-BiocManager::install("viridis")
-library(viridis)
-BiocManager::install("devtools")
 library(devtools)
-devtools::install_github("kassambara/easyGgplot2")
-BiocManager::install("reshape")
-library(reshape)
-BiocManager::install("reshape2")
-library(reshape2)
-BiocManager::install("grid")
-library(grid)
-BiocManager::install("gridExtra")
-library(gridExtra)
-BiocManager::install("lattice")
-library(lattice)
-BiocManager::install("DT")
+library(dplyr)
 library(DT)
-BiocManager::install("gtable")
+library(ggplot2)
+library(gridExtra)
 library(gtable)
-BiocManager::install("multiMiR")
-library(multiMiR)
-BiocManager::install("igraph")
 library(igraph)
-BiocManager::install("knitr")
-library(knitr)
-BiocManager::install("rmdformats")
+library(lattice)
+library(pheatmap)
+library(RColorBrewer)
+library(reshape2)
 library(rmdformats)
+library(tibble)
+library(viridis)
+
+
+# su "/usr/lib/R/library":
+if (!dir.exists("/data/.R/lib/grid")) {
+    BiocManager::install("grid")
+    }
+library(grid)
+
+
+# su "/usr/lib/R/site-library":
+
+#devtools::install_github("kassambara/easyGgplot2")
+if (!dir.exists("/data/.R/lib/easyGgplot2")) {
+    withr::with_libpaths(new="/data/.R/lib", devtools::install_github("kassambara/easyGgplot2") )
+}
+library(easyGgplot2)
+
+library(multiMiR)
 
 ```
 
