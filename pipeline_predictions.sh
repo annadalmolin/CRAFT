@@ -99,7 +99,8 @@ then
 	if [ ! -e /input/"mature_"$SPECIES".fa" ]
 	then
 		MIRNA_FILE="/input/mature_miRNA.txt"
-		cat $MIRNA_FILE | grep $SPECIES | sed -e 's/\t/\n/' | sed -e 's/ MIMAT.*$//' > /input/mature_$SPECIES.fa
+		cat $MIRNA_FILE | grep $SPECIES | sed -e 's/\t/\n/' | sed -e 's/ MIMAT.*$//' > /data/input/.mature_$SPECIES.fa
+		MIRNA_FILE="/data/input/.mature_"$SPECIES".fa"
 	fi
 
 
@@ -192,13 +193,13 @@ case $PRED in
     "M")
 	if [ ! -d "/data/functional_predictions/miRNA_detection" ]
 	then
-		/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+		/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 		echo "MiRNA binding site prediction analysis completed."
 	else
 		if [ ! -e "/data/functional_predictions/miRNA_detection/miRanda/output_miRanda_per_R.txt" ] | [ ! -e "/data/functional_predictions/miRNA_detection/PITA/pred_pita_results_per_R.txt" ]	# the analysis was not successful
 		then
 			rm -rf /data/functional_predictions/miRNA_detection
-			/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+			/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 			echo "MiRNA binding site prediction analysis completed."
 		else
 			echo "MiRNA binding site prediction analysis already performed."
@@ -209,7 +210,7 @@ case $PRED in
     "R")
 	if [ ! -d "/data/functional_predictions/RBP_detection" ]
 	then
-		if [$SPECIES != "hsa"]
+		if [ $SPECIES != "hsa" ]
 		then
 			echo "Human PWMs will be used instead for RBP binding."
 		fi
@@ -221,7 +222,7 @@ case $PRED in
 		then
 			rm -rf /data/functional_predictions/RBP_detection
 
-			if [$SPECIES != "hsa"]
+			if [ $SPECIES != "hsa" ]
 			then
 				echo "Human PWMs will be used instead for RBP binding."
 			fi
@@ -254,13 +255,13 @@ case $PRED in
     "MR")
 	if [ ! -d "/data/functional_predictions/miRNA_detection" ]
 	then
-		/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+		/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 		echo "MiRNA binding site prediction analysis completed."
 	else
 		if [ ! -e "/data/functional_predictions/miRNA_detection/miRanda/output_miRanda_per_R.txt" ] | [ ! -e "/data/functional_predictions/miRNA_detection/PITA/pred_pita_results_per_R.txt" ]	# the analysis was not successful
 		then
 			rm -rf /data/functional_predictions/miRNA_detection
-			/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+			/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 			echo "MiRNA binding site prediction analysis completed."
 		else
 			echo "MiRNA binding site prediction analysis already performed."
@@ -269,7 +270,7 @@ case $PRED in
 
 	if [ ! -d "/data/functional_predictions/RBP_detection" ]
 	then
-		if [$SPECIES != "hsa"]
+		if [ $SPECIES != "hsa" ]
 		then
 			echo "Human PWMs will be used instead for RBP binding."
 		fi
@@ -281,7 +282,7 @@ case $PRED in
 		then
 			rm -rf /data/functional_predictions/RBP_detection
 
-			if [$SPECIES != "hsa"]
+			if [ $SPECIES != "hsa" ]
 			then
 				echo "Human PWMs will be used instead for RBP binding."
 			fi
@@ -297,13 +298,13 @@ case $PRED in
     "MO")
 	if [ ! -d "/data/functional_predictions/miRNA_detection" ]
 	then
-		/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+		/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 		echo "MiRNA binding site prediction analysis completed."
 	else
 		if [ ! -e "/data/functional_predictions/miRNA_detection/miRanda/output_miRanda_per_R.txt" ] | [ ! -e "/data/functional_predictions/miRNA_detection/PITA/pred_pita_results_per_R.txt" ]	# the analysis was not successful
 		then
 			rm -rf /data/functional_predictions/miRNA_detection
-			/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+			/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 			echo "MiRNA binding site prediction analysis completed."
 		else
 			echo "MiRNA binding site prediction analysis already performed."
@@ -329,7 +330,7 @@ case $PRED in
     "RO")
 	if [ ! -d "/data/functional_predictions/RBP_detection" ]
 	then
-		if [$SPECIES != "hsa"]
+		if [ $SPECIES != "hsa" ]
 		then
 			echo "Human PWMs will be used instead for RBP binding."
 		fi
@@ -341,7 +342,7 @@ case $PRED in
 		then
 			rm -rf /data/functional_predictions/RBP_detection
 
-			if [$SPECIES != "hsa"]
+			if [ $SPECIES != "hsa" ]
 			then
 				echo "Human PWMs will be used instead for RBP binding."
 			fi
@@ -372,13 +373,13 @@ case $PRED in
     "MRO")
 	if [ ! -d "/data/functional_predictions/miRNA_detection" ]
 	then
-		/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+		/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 		echo "MiRNA binding site prediction analysis completed."
 	else
 		if [ ! -e "/data/functional_predictions/miRNA_detection/miRanda/output_miRanda_per_R.txt" ] | [ ! -e "/data/functional_predictions/miRNA_detection/PITA/pred_pita_results_per_R.txt" ]	# the analysis was not successful
 		then
 			rm -rf /data/functional_predictions/miRNA_detection
-			/scripts/script_miRNA_detection.sh /input/mature_$SPECIES.fa $SCORE $ENERGY
+			/scripts/script_miRNA_detection.sh $MIRNA_FILE $SCORE $ENERGY
 			echo "MiRNA binding site prediction analysis completed."
 		else
 			echo "MiRNA binding site prediction analysis already performed."
@@ -387,7 +388,7 @@ case $PRED in
 
 	if [ ! -d "/data/functional_predictions/RBP_detection" ]
 	then
-		if [$SPECIES != "hsa"]
+		if [ $SPECIES != "hsa" ]
 		then
 			echo "Human PWMs will be used instead for RBP binding."
 		fi
@@ -399,7 +400,7 @@ case $PRED in
 		then
 			rm -rf /data/functional_predictions/RBP_detection
 
-			if [$SPECIES != "hsa"]
+			if [ $SPECIES != "hsa" ]
 			then
 				echo "Human PWMs will be used instead for RBP binding."
 			fi
@@ -440,7 +441,33 @@ cd ..
 
 # 3) graphical output
 
-mkdir /data/graphical_output
+# prepare 1
+if [ ! -d "/data/.R" ]
+then
+	mkdir /data/.R
+fi
+
+if [ ! -d "/data/.R/lib" ]
+then
+	mkdir /data/.R/lib
+fi
+
+
+# prepare 2
+if [ ! -d "/data/.scripts" ]
+then
+	mkdir /data/.scripts
+fi
+
+cp /scripts/functional_predictions_* /data/.scripts/
+
+
+
+if [ ! -d "/data/graphical_output" ]
+then
+	mkdir /data/graphical_output
+fi
+
 cd /data/graphical_output
 
 cat $PARAMS | sed -n '1,2 p' > ../params_R.txt
@@ -457,10 +484,13 @@ fi
 
 for CIRC in $( cat $CIRC_LIST | cut -f1 )
 do
-	mkdir $CIRC
+	if [ ! -d $CIRC ]
+	then
+		mkdir $CIRC
+	fi
 	cd $CIRC
 
-	R -e "rmarkdown::render('/scripts/functional_predictions_single_circRNA.Rmd', output_file='functional_predictions_single_circRNA.html', output_dir='.', params = list(circ='$CIRC', $PARAMS_CIRC))"
+	R -e "rmarkdown::render('/data/.scripts/functional_predictions_single_circRNA.Rmd', output_file='functional_predictions_single_circRNA.html', output_dir='.', params = list(circ='$CIRC', $PARAMS_CIRC))"
 	mv functional_predictions_single_circRNA.html functional_predictions_$CIRC.html
 
 	cd ..
@@ -477,14 +507,18 @@ then
 	PARAMS_GENERAL="l=50000, score_miRNA=80, energy_miRNA=-15, dGduplex_miRNA=-15, dGopen_miRNA=-15, voteFrac_RBP=0.15"		# default
 fi
 
-mkdir general
+if [ ! -d "general" ]
+then
+	mkdir general
+fi
 cd general
 
-R -e "rmarkdown::render('/scripts/functional_predictions_all_circRNAs.Rmd', output_file='functional_predictions_all_circRNAs.html', output_dir='.', params = list($PARAMS_GENERAL))"
+R -e "rmarkdown::render('/data/.scripts/functional_predictions_all_circRNAs.Rmd', output_file='functional_predictions_all_circRNAs.html', output_dir='.', params = list($PARAMS_GENERAL))"
 
 cd ..
 
 
+rm -rf /data/.scripts
 rm ../params_R.txt
 
 
