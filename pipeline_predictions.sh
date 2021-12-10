@@ -13,19 +13,19 @@
 #3 row: path to miRNA sequences file
 #
 #"params.txt"
-#1 row: PRED		 # PRED can be "M" for miRNA prediction, "R" for RBP prediction, "O" for ORF prediction; "MR", "MO", "RO" or "MRO" for a combination of the previous
-#2 row: SPECIES		 # one of the species in miRBase: hsa, mmu, etc.
-#3 row: PARAMS_miRanda	 # in order, separated by tab: miRanda_score miRanda_energy; default: 80 -15
-#4 row: PARAMS_beRBP	 # in order, separated by tab: "PWM" "RBP" "prefix"; multiple PWMs (separated by ", ") and associated RBP (separated by ", ") are also allowed. Default: "all" "all"
+#1 row: PRED		  # PRED can be "M" for miRNA prediction, "R" for RBP prediction, "O" for ORF prediction; "MR", "MO", "RO" or "MRO" for a combination of the previous
+#2 row: SPECIES	  # one of the species in miRBase: hsa, mmu, etc.
+#3 row: PARAMS_miRanda	  # in order, separated by tab: miRanda_score miRanda_energy; default: 80 -15
+#4 row: PARAMS_beRBP	  # in order, separated by tab: "PWM" "RBP" "prefix"; multiple PWMs (separated by ", ") and associated RBP (separated by ", ") are also allowed. Default: "all" "all"
 #5 row: PREFIX_UCSC      # prefix of the UCSC genome used by beRBP; ex. "hg38"
 #6 row: PARAMS_ORFfinder # in order, separated by tab: GEN_CODE START_CODON MIN_LENGTH NESTED_ORFS STRAND
-#			 # GEN_CODE: genetic code to use (1-31), see https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi for details; default: 1
-#			 # START_CODON: start codon to use (0 = "ATG" only, 1 = "ATG" and alternative initiation codons, 2 = any sense codon); default: 0
-#			 # MIN_LENGTH: minimal length of the ORF (nt); allowed values are: 30, 75, 150. Default: 30
-#			 # NESTED_ORFS: ignore nested ORFs (ORFs completely placed within another); allowed values: "TRUE", "FALSE". Default: "FALSE"
-#			 # STRAND: output ORFs on specified strand only; allowed values: "both", "plus", "minus". Default: "plus"
-#7 row: PARAMS_CIRC	 # i.e. "l=50000, score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10, voteFrac_RBP=0.3"
-#8 row: PARAMS_GENERAL	 # i.e. "l=50000, score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10, voteFrac_RBP=0.3"
+#			  # GEN_CODE: genetic code to use (1-31), see https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi for details; default: 1
+#			  # START_CODON: start codon to use (0 = "ATG" only, 1 = "ATG" and alternative initiation codons, 2 = any sense codon); default: 0
+#			  # MIN_LENGTH: minimal length of the ORF (nt); allowed values are: 30, 75, 150. Default: 30
+#			  # NESTED_ORFS: ignore nested ORFs (ORFs completely placed within another); allowed values: "TRUE", "FALSE". Default: "FALSE"
+#			  # STRAND: output ORFs on specified strand only; allowed values: "both", "plus", "minus". Default: "plus"
+#7 row: PARAMS_CIRC	  # i.e. "l=50000, score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10, voteFrac_RBP=0.3"
+#8 row: PARAMS_GENERAL	  # i.e. "l=50000, score_miRNA=125, energy_miRNA=-25, dGduplex_miRNA=-22, dGopen_miRNA=-10, voteFrac_RBP=0.3"
 
 ## command: ./scripts/pipeline_predictions.sh /data/list_backsplice.txt /data/path_files.txt /data/params.txt
 
