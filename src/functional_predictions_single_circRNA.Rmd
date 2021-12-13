@@ -1,0 +1,3376 @@
+---
+title: "CRAFT functional predictions"
+author: "Please cite: _Dal Molin et al. CRAFT: a bioinformatics software for custom prediction of circular RNA functions_" #"Author: Anna Dal Molin"
+date: "`r Sys.Date()`"
+header-includes:
+    \usepackage{caption}
+output:
+  rmdformats::readthedown:
+  html_document:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  editor_options: 
+    chunk_output_type: inline
+params:
+    circ: ""
+    l: 50000
+    QUANTILE1: "FALSE"
+    thr1: 0.95
+    score_miRNA: 80
+    energy_miRNA: -15
+    QUANTILE2: "FALSE"
+    thr2: 0.95
+    dGduplex_miRNA: -15
+    dGopen_miRNA: -15
+    QUANTILE3: "FALSE"
+    thr3: 0.9
+    voteFrac_RBP: 0.15
+    orgdb: "org.Hs.eg.db"
+    meshdb: "MeSH.Hsa.eg.db"
+    symbol2eg: "org.Hs.egSYMBOL2EG"
+    eg2uniprot: "org.Hs.egUNIPROT"
+    org: "hsapiens"
+---
+    
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = TRUE, dpi = 600, root.dir = "/data/.scripts/")
+
+```
+
+```{r libraries, echo=FALSE, include=FALSE}
+
+.libPaths( c( '/data/.R/lib', .libPaths()) )
+
+# su "/usr/local/lib/R/site-library":
+
+library("knitr")
+
+library(BiocManager)
+
+library(dplyr)
+library(tibble)
+library(data.table)
+library(ggplot2)
+library(RColorBrewer)
+library(viridis)
+library(reshape2)
+library(DT)
+library(gtable)
+library(tidyverse)
+library(cowplot)
+library(plyr)
+library(gt)
+library(glue)
+library(rmdformats)
+library(ggrepel)
+library(ggupset)
+library(ggnewscale)
+
+
+# su "/usr/lib/R/site-library":
+
+library(AnnotationDbi)
+#BiocManager::install(params$meshdb)
+#library(params$meshdb, character.only = TRUE)   # MeSH-related packages (MeSH.XXX.eg.db, MeSH.db, MeSH.AOR.db, and MeSH.PCR.db) were deprecated in Bioconductor 3.14
+library(multiMiR)
+library(topGO)
+library(DOSE)
+library(enrichplot)
+if (!dir.exists(paste0("/data/.R/lib/", params$orgdb))) { BiocManager::install(params$orgdb, lib="/data/.R/lib") }
+library(params$orgdb, character.only = TRUE)
+library(clusterProfiler)                          # do not update "rvcheck"
+library(ReactomePA)
+library(meshes)
+library(UniprotR)
+
+```
+
+```{r input, echo=FALSE, include=FALSE}
+
+## Upload input files
+
+# file of parameters
+file_parameters <- "/data/params_R.txt"
+parameters <- read.table(file_parameters, header=F)
+parameters <- as.data.table(parameters)
+
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    # miRNA prediction
+    
+    # miRanda
+    file_miRanda <- "/data/functional_predictions/miRNA_detection/miRanda/output_miRanda_per_R.txt"
+    miRanda_pred <- read.table(file_miRanda, header=T, sep="\t")
+    miRanda_pred <- as.data.table(miRanda_pred)
+
+    # PITA
+    file_PITA <- "/data/functional_predictions/miRNA_detection/PITA/pred_pita_results_per_R.txt"
+    PITA_pred <- read.table(file_PITA, header=T, sep="\t")
+    PITA_pred <- as.data.table(PITA_pred)
+
+}
+
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # RBP predictions
+    
+    file_beRBP <- "/data/functional_predictions/RBP_detection/beRBP/analysis_RBP/resultMatrix_b.txt"
+    beRBP_pred <- read.table(file_beRBP, header=T, sep="\t")
+    beRBP_pred <- as.data.table(beRBP_pred)
+
+}
+
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # ORF prediction
+    
+    file_ORFfinder <- "/data/functional_predictions/ORF_detection/ORFfinder/ORF_backsplice.txt"
+    ORFfinder_pred <- read.table(file_ORFfinder, header=T, sep="\t")
+    ORFfinder_pred <- as.data.table(ORFfinder_pred)
+
+    file_openORF <- "/data/functional_predictions/ORF_detection/ORFfinder/ORF_backsplice_open.txt"
+    openORF <- read.table(file_openORF, header=T, sep="\t")
+    openORF <- as.data.table(openORF)
+
+    file_list_CDS <- "/data/functional_predictions/ORF_detection/ORFfinder/result_list_CDS.txt"
+    list_CDS <- read.table(file_list_CDS, header=F, sep="\t")
+    list_CDS <- as.data.table(list_CDS)
+
+    file_list_ORF <- "/data/functional_predictions/ORF_detection/ORFfinder/result_list_ORF.txt"
+    list_ORF <- read.table(file_list_ORF, header=F, sep="\t")
+    list_ORF <- as.data.table(list_ORF)
+
+}
+
+
+# circRNA length
+file_circ_length <- "/data/functional_predictions/backsplice_circRNA_length_1.txt"
+circ_length <- read.table(file_circ_length, header=T, sep="\t")
+circ_length <- as.data.table(circ_length)
+
+
+# gene names
+file_gene_names <- "/data/functional_predictions/backsplice_gene_name.txt"
+gene_names <- read.table(file_gene_names, header=T, sep="\t")
+gene_names <- as.data.table(gene_names)
+
+```
+
+```{r output, echo=FALSE, include=FALSE}
+
+output_dir <- paste0("/data/graphical_output/", params$circ, "/")
+
+```
+
+```{r logo, echo=FALSE, include=TRUE}
+
+htmltools::img(src = knitr::image_uri("/input/CRAFT_logo.png"),
+               alt = 'logo', 
+               style = 'position:absolute; top: -25px; right: 700px; padding:12px; height:160px; width:160px')
+               #style = 'position:absolute; top:5px; right:50px; padding:10px; height:180px; width:180px')  # theme cerulean
+
+```
+
+
+```{r, echo=FALSE, include=FALSE}
+
+circ_name <- gene_names[circ_id %in% params$circ, gene_names]
+
+```
+
+---
+subtitle: Circ`r circ_name` (`r params$circ`) functional predictions
+---
+
+
+
+# Summary
+
+```{r, echo=FALSE, include=FALSE}
+
+# remove circRNAs with length > "l"
+circ_l <- circ_length[length < params$l, circ_id]
+
+```
+
+```{r miRanda, echo=FALSE, include=FALSE}
+
+### miRNA predictions
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    ## miRanda
+    
+    # remove circRNAs with length > "l"
+    miRanda_pred_l <- miRanda_pred[circ_id %in% circ_l,]
+
+    
+    # select the circRNA of interest
+    miRanda_pred_l_circ <- miRanda_pred_l[circ_id == params$circ,]
+    
+    
+    # filter on "score" ed "energy"
+    if (params$QUANTILE1 == "TRUE") {
+        score_miRNA <- quantile(miRanda_pred_l_circ$score, params$thr1)
+        energy_miRNA <- quantile(miRanda_pred_l_circ$energy, 1-params$thr1)
+    } else {
+        score_miRNA <- params$score_miRNA
+        energy_miRNA <- params$energy_miRNA
+    }
+    
+    miRanda_pred_l_circ_sel <- miRanda_pred_l_circ[(score > score_miRNA & energy < energy_miRNA),]
+
+}
+
+```
+
+```{r PITA, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    ## PITA
+    
+    # remove circRNAs with length > "l"
+    PITA_pred_l <- PITA_pred[circ_id %in% circ_l,]
+    
+    
+    # select the circRNA of interest
+    PITA_pred_l_circ <- PITA_pred_l[circ_id == params$circ,]
+    
+    
+    # filter on "dGduplex" and "dGopen"
+    if (params$QUANTILE2 == "TRUE") {
+        dGduplex_miRNA <- quantile(PITA_pred_l_circ$dGduplex, 1-params$thr2)
+        dGopen_miRNA <- quantile(PITA_pred_l_circ$dGopen, params$thr2)
+    } else {
+        dGduplex_miRNA <- params$dGduplex_miRNA
+        dGopen_miRNA <- params$dGopen_miRNA
+    }
+    
+    PITA_pred_l_circ_sel <- PITA_pred_l_circ[(dGduplex < dGduplex_miRNA & dGopen > dGopen_miRNA),]
+
+}
+
+```
+
+```{r miRNA_pred, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    # merge miRanda and PITA predictions
+    
+    miRanda_pred_l_circ_sel$circ_miRNA_end_id <- paste0(miRanda_pred_l_circ_sel$circ_id, "__", miRanda_pred_l_circ_sel$miRNA_id, "__", miRanda_pred_l_circ_sel$circ_end)
+    
+    PITA_pred_l_circ_sel$circ_miRNA_end_id <- paste0(PITA_pred_l_circ_sel$circ_id, "__", PITA_pred_l_circ_sel$miRNA_id, "__", PITA_pred_l_circ_sel$circ_end)
+    
+    
+    setkey(miRanda_pred_l_circ_sel, circ_miRNA_end_id)
+    setkey(PITA_pred_l_circ_sel, circ_miRNA_end_id)
+    miRNA_pred <- merge(miRanda_pred_l_circ_sel, PITA_pred_l_circ_sel, all=FALSE)
+    
+    miRNA_pred <- data.table("circ_id" = miRNA_pred$circ_id.x, "miRNA_id" = miRNA_pred$miRNA_id.x, "putative_circ_start" = miRNA_pred$circ_end.x - 22, "circ_end" = miRNA_pred$circ_end.x, "miRanda_score" = miRNA_pred$score, "miRanda_energy" = miRNA_pred$energy, "circ_align_perc" = miRNA_pred$circ_align_perc, "miRNA_align_perc" = miRNA_pred$miRNA_align_perc, "dGduplex" = miRNA_pred$dGduplex, "dG5" = miRNA_pred$dG5, "dG3" = miRNA_pred$dG3, "dG0" = miRNA_pred$dG0, "dG1" = miRNA_pred$dG1, "dGopen" = miRNA_pred$dGopen, "ddG" = miRNA_pred$ddG)
+
+}
+
+```
+
+```{r barM, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    barM <- miRNA_pred[, c("circ_id", "miRNA_id", "putative_circ_start", "circ_end")]
+    colnames(barM)[3] <- "circ_start"
+    
+    barM$circ_miRNA_start_id <- paste0(barM$circ_id, "__", barM$miRNA_id, "__", barM$circ_start)
+
+}
+
+```
+
+
+
+```{r RBP, echo=FALSE, include=FALSE}
+
+## RBP binding sites predictions
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # beRBP
+    
+    # remove circRNAs with length > "l"
+    beRBP_pred_l <- beRBP_pred[circ_id %in% circ_l,]
+    
+    
+    # select the circRNA of interest
+    beRBP_pred_l_circ <- beRBP_pred_l[circ_id == params$circ,]
+    
+    
+    # filter on "voteFrac"
+    if (params$QUANTILE3 == "TRUE") {
+        voteFrac_RBP <- quantile(beRBP_pred_l_circ$voteFrac, params$thr3)
+    } else {
+        voteFrac_RBP <- params$voteFrac_RBP
+    }
+    
+    beRBP_pred_l_circ_sel <- beRBP_pred_l_circ[voteFrac >= voteFrac_RBP,]
+
+}
+
+```
+
+```{r barP, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    barP <- beRBP_pred_l_circ_sel
+    
+    colnames(barP)[1] <- "circ_id"
+    colnames(barP)[5] <- "circ_start"
+    barP$circ_RBP_start_id <- paste0(barP$circ_id, "__", barP$RBP, "__", barP$circ_start)
+
+}
+
+```
+
+
+
+```{r ORF, echo=FALSE, include=FALSE}
+
+## ORF predictions
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # ORFfinder
+    
+    # remove circRNAs with length > "l"
+    ORFfinder_pred_l <- ORFfinder_pred[circ_id %in% circ_l,]
+    
+    openORF_l <- openORF[circ_id %in% circ_l,]
+    openORF_l[open == "open",]$open <- "T"
+    
+    
+    # select the circRNA of interest
+    ORFfinder_pred_l_circ <- ORFfinder_pred_l[circ_id == params$circ,]
+    
+    openORF_l_circ <- openORF_l[circ_id == params$circ,]
+    
+    
+    # select only the longest ORF with a stop codon
+    l2 <- circ_length[circ_id == params$circ]$length
+    
+    if (ORFfinder_pred_l_circ[, .N] >= 1) {
+        
+        ORFfinder_pred_l_circ_best <- head(ORFfinder_pred_l_circ[order(-length_aa),], 1)
+        
+        orf_start <- ORFfinder_pred_l_circ_best$start
+        
+        orf_end <- l2 - (2*l2 - ORFfinder_pred_l_circ_best$end)   # ORF crossing the bks
+
+    } else {
+        
+        orf_start <- l2
+        orf_end <- 0
+    
+    }
+
+}
+
+```
+
+
+
+```{r circular_barplot_miRNA-RBP-ORF, echo=FALSE, include=TRUE, fig.width=11, fig.height=11}
+
+if (parameters[1] == "MRO") {
+
+    # Create dataset
+
+    dataM <- data.table("circ_id" = barM$circ_id,
+                        "binding" = barM$miRNA_id,
+                        "circ_start" = barM$circ_start,
+                        "label" = "miRNA"
+                        )
+
+    dataP <- data.table("circ_id" = barP$circ_id,
+                        "binding" = barP$RBP,
+                        "circ_start" = barP$circ_start,
+                        "label" = "RBP"
+                        )
+    dataP <- unique(dataP)
+
+
+    data <- rbind(dataM, dataP)
+    data$label <- as.factor(data$label)
+    
+    
+    n <- max(data[, .N, by = circ_start]$N)
+    
+    
+    # Get the name and the y position of each label
+    label_data <- data
+    # calculate the ANGLE of the labels
+    number_of_bar <- l2
+    angle <- 90 - 360 * (label_data$circ_start-0.5) / number_of_bar
+    label_data$hjust <- ifelse(angle < -90, 1, 0)
+    # flip angle BY to make them readable
+    label_data$angle <- ifelse(angle < -90, angle+180, angle)
+    label_data[hjust == 1, "hjust"] <- 0
+    
+    
+    # Prepare a data frame for grid (scales)
+    grid_data <- data.table("start" = 0,
+                            "end" = l2)
+    
+    
+    # Make the plot
+    circ_plot <- ggplot(data, aes(x = circ_start, y = 1, fill = label)) +
+        
+                geom_bar(aes(x = circ_start, y = 1), stat="identity", alpha=0.5, width=l2*3/500) +
+                scale_fill_manual(values = c("#E65100", "#1565C0")) +
+    
+                # Add lines
+                geom_segment(data=grid_data, aes(x = start+4, y = 0, xend = end-4, yend = 0), colour = "darkgrey", alpha=1, size=2.5, inherit.aes = FALSE ) +                             
+                geom_segment(data=grid_data, aes(x = end-4, y = 0, xend = end, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) +                                    
+                geom_segment(data=grid_data, aes(x = start, y = 0, xend = start+4, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) +                                
+
+                geom_segment(data=grid_data, aes(x = orf_start, y = 0.1, xend = l2, yend = 0.15), colour = "darkred", alpha=1, size=1, inherit.aes = FALSE ) +                              
+                geom_segment(data=grid_data, aes(x = 0, y = 0.15, xend = orf_end, yend = 0.2), colour = "darkred", alpha=1, size=1, inherit.aes = FALSE ) +                               
+    
+                # Add text
+                annotate("text", x = 0, y = 0.3, label = "ORF", color="darkred", size=3, angle=0, fontface="plain", hjust=1) +
+                annotate("text", x = 20, y = -0.12, label = "bks", color = "black", size = 3, fontface = "bold", hjust=1) +
+        
+                ylim(-1, n+1.5) +
+        
+                labs(fill = "Interaction") +
+        
+                theme_minimal() +
+                theme(
+                    legend.position = "right",
+                    text = element_text(size=8),
+                    axis.title = element_blank(),
+                    axis.text.x = element_text(angle=0, hjust=1),
+                    axis.text.y = element_text(angle=0, hjust=12.7, vjust=-0.3)
+                  ) +
+    
+                coord_polar(start = 0) +
+        
+                # Add labels on top of each bar
+                geom_text_repel(data = label_data, aes(x = circ_start, y = n+0.1, label = binding, hjust = hjust),
+                          color="black",
+                          fontface="bold",
+                          alpha=0.6, 
+                          size=2.5,
+                          angle=angle,
+                          inherit.aes = FALSE,
+                          max.overlaps = 50)
+    
+
+    print(circ_plot)
+    
+    
+    # Save at png
+    ggsave(circ_plot, file=paste0(output_dir, "circplot_all_predictions.png"), width=11, height=11, dpi = 600)
+
+}
+
+```
+
+
+
+
+
+# MiRNA binding sites predictions
+
+```{r print_0, echo=FALSE, include=FALSE}
+
+print_0 <- "Analysis not performed."
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    print_0 <- ""
+
+}
+
+```
+
+`r print_0`
+
+```{r circular_barplot_miRNA, echo=FALSE, include=TRUE, fig.width=10, fig.height=10}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        # Create dataset
+        data <- barM
+        
+        n <- max(data[, .N, by = circ_start]$N)
+        l <- circ_length[circ_id == params$circ]$length
+        
+        
+        # Get the name and the y position of each label
+        label_data <- data
+        # calculate the ANGLE of the labels
+        number_of_bar <- l
+        angle <- 90 - 360 * (label_data$circ_start-0.5) / number_of_bar
+        label_data$hjust <- ifelse(angle < -90, 1, 0)
+        # flip angle BY to make them readable
+        label_data$angle <- ifelse(angle < -90, angle+180, angle)
+        label_data[hjust == 1, "hjust"] <- 0
+        
+        
+        # Prepare a data frame for grid (scales)
+        grid_data <- data.table("start" = 0,
+                                "end" = l)
+        
+        # Make the plot
+        circ_plot <- ggplot(data, aes(x = circ_start, y = 1)) +
+            
+                    geom_bar(aes(x = circ_start, y = 1), fill=alpha("#1565C0", 0.7), stat="identity", alpha=0.5, width=l*3/500) +
+            
+                    # Add lines
+                    geom_segment(data=grid_data, aes(x = start+4, y = 0, xend = end-4, yend = 0), colour = "darkgrey", alpha=1, size=2.5, inherit.aes = FALSE ) +                             
+                    geom_segment(data=grid_data, aes(x = end-4, y = 0, xend = end, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) +                                    
+                    geom_segment(data=grid_data, aes(x = start, y = 0, xend = start+4, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) +                                
+    
+                    #Add text
+                    annotate("text", x = 20, y = -0.12, label = "bks", color = "black", size = 3, fontface = "bold", hjust=1) +
+            
+                    ylim(-1, n+1.5) +
+            
+                    theme_minimal() +
+                    theme(
+                        legend.position = "none",
+                        text = element_text(size=8),
+                        axis.title = element_blank(),
+                        axis.text.x = element_text(angle=0, hjust=1),
+                        axis.text.y = element_text(angle=0, hjust=12.7, vjust=-0.3)
+                      ) +
+        
+                    coord_polar(start = 0) +
+        
+                    # Add labels on top of each bar
+                    geom_text_repel(data = label_data, aes(x = circ_start, y = n+0.1, label = miRNA_id, hjust = hjust),
+                                    color="black",
+                                    fontface="bold",
+                                    alpha=0.6, 
+                                    size=2.5,
+                                    angle=angle,
+                                    inherit.aes = FALSE,
+                                    max.overlaps = 50)
+        
+        
+        print(circ_plot)
+        
+        
+        # Save at png
+        ggsave(circ_plot, file=paste0(output_dir, "circplot_miRNA.png"), width=10, height=10, dpi = 600)
+
+    }
+    
+}
+
+```
+
+```{r pre_table_miRNA_binding_sites, echo=FALSE, include=TRUE}
+
+if ((parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") & (miRNA_pred[, .N] > 0)) {
+
+    setkey(miRNA_pred, circ_id)
+    setkey(gene_names, circ_id)
+    miRNA_pred <- miRNA_pred[gene_names, nomatch = 0]
+    
+    miRNA_pred$gene_circ_names <- paste0("circ", miRNA_pred$gene_names, "_", miRNA_pred$circ_id)
+
+} else {
+    
+    miRNA_pred <- data.table(miRNA_id = integer())
+    
+}
+
+```
+
+Number of different identified miRNAs: `r length(unique(miRNA_pred$miRNA_id))`.
+
+
+```{r table_miRNA_binding_sites, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+
+        data_escape <- miRNA_pred[, c(1,16,seq(2,15))]
+    
+        data_escape$gene_names <- paste0("<a href=\"", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=", data_escape$gene_names, "\" target=\"_blank\">", data_escape$gene_names, "</a>")
+        data_escape$miRNA_id <- paste0("<a href=\"", "http://www.mirbase.org/textsearch.shtml?q=", data_escape$miRNA_id, "&submit=submit", "\" target=\"_blank\">", data_escape$miRNA_id, "</a>")
+        
+        
+        datatable(data = data_escape,
+                  rownames = F,
+                  colnames = c("CircRNA", "Gene name", "MiRNA", "CircRNA start position", "CircRNA end position", "MiRanda score", "MiRanda energy", "% alignment circRNA", "% alignment miRNA", "dGduplex", "dG5", "dG3", "dG0", "dG1", "dGopen", "ddG"),
+                  style = "bootstrap",
+                  class = "compact display",
+                  caption = paste0("Predicted miRNA binding sites. CircRNA host gene name is linked to GeneCards, miRNA name is linked to miRBase. Filters are based on highlighted columns (miRanda score > ", score_miRNA,", miRanda energy < ", energy_miRNA, "; PITA dGduplex < ", dGduplex_miRNA, ", PITA dGopen > ", dGopen_miRNA, "). Best predictions are obtained with higher score and lower energy for miRanda, and lower dGduplex and higher dGopen for PITA."),
+                  fillContainer = F,
+                  autoHideNavigation = T,
+                  filter = "top",
+                  escape = FALSE,
+                  extensions = c('ColReorder', 'Buttons', 'KeyTable'),
+                  options = list(colReorder = TRUE,
+                                 searching = TRUE,
+                                 pageLength = 10,
+                                 dom = 'Bfrtip',
+                                 buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                 keys = TRUE
+                                )
+                ) %>%
+            formatStyle(c("miRanda_score", "miRanda_energy", "dGduplex", "dGopen"), 
+                        backgroundColor = 'lightskyblue'
+                        )
+
+    }
+    
+}
+
+```
+
+
+## Validated miRNA target genes (TGs)
+
+```{r, echo=FALSE, include=FALSE}
+
+# validated target genes
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+            
+            ## multiMir
+            
+            multimir_results_all <- data.table()
+            
+            miRNA_id <- barM$miRNA_id
+            
+            if (length(miRNA_id) > 0) {
+        
+                specie <- case_when(
+                             parameters[2] == "hsa" ~ "hsa",
+                             parameters[2] == "mmu" ~ "mmu",
+                             parameters[2] == "rno" ~ "rno"
+                                )
+                
+                multimir_results <- get_multimir(org = specie, mirna = miRNA_id, table = 'validated', summary = TRUE)
+                multimir_results <- as.data.table(multimir_results@data)
+        
+                #filter for strong categories
+                multimir_results <- multimir_results[grep("PAR-CLIP|HITS-CLIP|CLASH|Luciferase|Degradome|ChIP-seq|ELISA|Immuno.*", experiment),]
+                multimir_results <- multimir_results[support_type != "Functional MTI (Weak)",]
+            
+                if (multimir_results[, .N] != 0) {
+            
+                    pair_miRNA_tg <- unique(multimir_results[, 3:4])
+                    pair_miRNA_tg <- pair_miRNA_tg[target_symbol != "",]
+        
+                    tg_per_miRNA <- pair_miRNA_tg[, .N, by = mature_mirna_id]                 # unique
+                    tg_per_miRNA$mature_mirna_id <- paste0("<a href=\"", "http://www.mirbase.org/textsearch.shtml?q=", tg_per_miRNA$mature_mirna_id, "&submit=submit", "\" target=\"_blank\">", tg_per_miRNA$mature_mirna_id, "</a>")
+        
+                    miRNA_per_tg <- pair_miRNA_tg[, .N, by = target_symbol][order(-N),]
+        
+                }
+                
+            }
+            
+        }
+        
+    }
+
+}
+
+```
+
+```{r print_1, echo=FALSE, include=FALSE}
+
+print_1 <- "Number of identified TGs: 0."
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+    
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0) {
+                
+                if (multimir_results[, .N] != 0) {
+                    
+                    print_1 <- paste0("Number of identified TGs: ", length(unique(miRNA_per_tg$target_symbol)), ".")
+                    
+                }
+            
+            }
+        
+        }
+        
+    }
+    
+}
+
+```
+
+`r print_1`
+
+```{r table_validated_TG, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+    
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0) {   # not necessary
+            
+                data_escape <- multimir_results
+                data_escape <- data_escape[, -"mature_mirna_acc"]
+                
+                organism <- case_when(
+                                 parameters[2] == "hsa" ~ "Homo_sapiens",
+                                 parameters[2] == "mmu" ~ "Mus_musculus",
+                                 parameters[2] == "rno" ~ "Rattus_norvegicus"
+                                    )
+                
+                data_escape$mature_mirna_id <- paste0("<a href=\"", "http://www.mirbase.org/textsearch.shtml?q=", data_escape$mature_mirna_id, "&submit=submit", "\" target=\"_blank\">", data_escape$mature_mirna_id, "</a>")
+                data_escape$target_symbol <- paste0("<a href=\"", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=", data_escape$target_symbol, "\" target=\"_blank\">", data_escape$target_symbol, "</a>")
+                data_escape$target_entrez <- paste0("<a href=\"", "https://www.ncbi.nlm.nih.gov/gene/", data_escape$target_entrez,"\" target=\"_blank\">", data_escape$target_entrez, "</a>")
+                data_escape$target_ensembl <- paste0("<a href=\"", "https://www.ensembl.org/", organism ,"/Gene/Summary?db=core;g=", data_escape$target_ensembl, "\" target=\"_blank\">", data_escape$target_ensembl, "</a>")
+                data_escape$pubmed_id <- paste0("<a href=\"", "https://pubmed.ncbi.nlm.nih.gov/", data_escape$pubmed_id, "\" target=\"_blank\">", data_escape$pubmed_id, "</a>")
+                
+                colnames(data_escape) <- c("Database", "Mature miRNA id", "Target gene", "Entrez", "Ensembl", "Experiment", "Support type", "Pubmed", "Type")
+                
+                data_escape <- data_escape[order(Database),]
+            
+            
+                datatable(data = data_escape,
+                          rownames = F,
+                          style = "bootstrap",
+                          class = "compact display",
+                          caption = "Validated target genes (TGs). MiRNA name is linked to miRBase, TG name is linked to GeneCards, Entrez and Ensemble databases, the couple miRNA-TG is linked to Pubmed.",
+                          fillContainer = F,
+                          autoHideNavigation = T,
+                          filter = "top",
+                          escape = FALSE,
+                          extensions = c('ColReorder', 'Buttons', 'KeyTable', 'RowGroup'),
+                          options = list(colReorder = TRUE,
+                                         searching = TRUE,
+                                         pageLength = 10,
+                                         dom = 'Bfrtip',
+                                         buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                         keys = TRUE,
+                                         rowGroup = list(dataSrc = 0)
+                                        )
+                        )
+                
+            }
+        
+        }
+        
+    }
+    
+}
+
+```
+
+```{r table_TG_per_miRNA, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+        
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0) {
+                
+                tg_per_miRNA_escape <- tg_per_miRNA
+                colnames(tg_per_miRNA_escape) <- c("Mature miRNA", "Number of target genes")
+                
+                
+                datatable(data = tg_per_miRNA_escape,
+                          rownames = F,
+                          style = "bootstrap",
+                          class = "compact display",
+                          caption = "Target genes per miRNA. MiRNA name is linked to miRBase. Barplot highlights the number of target genes for each miRNA.",
+                          fillContainer = F,
+                          autoHideNavigation = T,
+                          filter = "top",
+                          escape = FALSE,
+                          extensions = c('ColReorder', 'Buttons', 'KeyTable'),
+                          options = list(colReorder = TRUE,
+                                         searching = TRUE,
+                                         pageLength = 10,
+                                         dom = 'Bfrtip',
+                                         buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                         keys = TRUE
+                                        )
+                        ) %>%
+                    formatStyle('Number of target genes',
+                                background = styleColorBar(tg_per_miRNA_escape$`Number of target genes`, 'steelblue'),
+                                backgroundSize = '100% 90%',
+                                backgroundRepeat = 'no-repeat',
+                                backgroundPosition = 'center'
+                            )
+            
+            }
+            
+        }
+
+    }
+}
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+        
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0) {
+                
+                pair_miRNA_tg$mature_mirna_id <- paste0("<a href=\"", "http://www.mirbase.org/textsearch.shtml?q=", pair_miRNA_tg$mature_mirna_id, "&submit=submit", "\" target=\"_blank\">", pair_miRNA_tg$mature_mirna_id, "</a>")
+                enr <- pair_miRNA_tg[, .(list(unique(mature_mirna_id)), length(unique(mature_mirna_id))), by = target_symbol]
+                colnames(enr)[2] <- "miRNA_ids"
+                colnames(enr)[3] <- "number_of_miRNA"
+                
+                # delete rows with empty "target_symbol"
+                enr <- enr[target_symbol != "",]
+                
+                enr$target_symbol <- paste0("<a href=\"", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=", enr$target_symbol, "\" target=\"_blank\">", enr$target_symbol, "</a>")
+    
+            }
+    
+        }
+        
+    }
+    
+}
+
+```
+
+```{r table_miRNA_per_TG, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0) {
+                
+                enr_escape <- enr
+                colnames(enr_escape) <- c("Target gene", "Mature miRNA", "Number of miRNAs")
+                
+                
+                STEP <- (0.95-0.05) / (max(enr_escape$`Number of miRNAs`)-1)
+                brks <- quantile(unique(enr_escape$`Number of miRNAs`), probs = seq(.05, .95, STEP), na.rm = TRUE)
+                clrs <- round(seq(255, 40, length.out = max(brks) + 1), 0) %>%
+                        {paste0("rgb(255,", ., ",", ., ")")}
+                
+                while(length(brks) >= length(clrs)) {
+                    brks <- brks[-1]
+                }
+                
+                
+                datatable(data = enr_escape,
+                          rownames = F,
+                          style = "bootstrap",
+                          class = "compact display",
+                          caption = "MiRNAs per target genes. Target gene name is linked to GeneCards, miRNA name is linked to miRBase. Rows are highlighted based on the number of miRNAs binding each target gene.",
+                          fillContainer = F,
+                          autoHideNavigation = T,
+                          filter = "top",
+                          escape = FALSE,
+                          extensions = c('ColReorder', 'Buttons', 'KeyTable'),
+                          options = list(colReorder = TRUE,
+                                         searching = TRUE,
+                                         pageLength = 10,
+                                         dom = 'Bfrtip',
+                                         buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                         keys = TRUE
+                                        )
+                        ) %>%
+                    formatStyle('Number of miRNAs',
+                                target = "row",
+                                backgroundColor = styleInterval(brks, clrs)
+                                )
+            
+            }
+    
+        }
+        
+    }
+    
+}
+
+```
+
+```{r table_miRNA-TG_interaction, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+        
+            # miRNA-target gene interactions associated with drugs or diseases
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0) {
+            
+                target_genes <- unique(sort(multimir_results[, "target_symbol"]$target_symbol))
+                target_genes <- target_genes[target_genes != ""]
+                
+                if (length(target_genes) > 0) {
+                
+                    multimir_results_drug_disease <- get_multimir(org = specie, mirna = miRNA_id, target = target_genes, table = 'disease.drug', summary = TRUE)
+                
+                    data_escape <- multimir_results_drug_disease@data
+                    data_escape <- as.data.table(data_escape)
+                    data_escape <- data_escape[, -"mature_mirna_acc"]
+                    
+                    data_escape$mature_mirna_id <- paste0("<a href=\"", "http://www.mirbase.org/textsearch.shtml?q=", data_escape$mature_mirna_id, "&submit=submit", "\" target=\"_blank\">", data_escape$mature_mirna_id, "</a>")
+                    data_escape$target_symbol <- ifelse(data_escape$target_symbol != "NA", paste0("<a href=\"", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=", data_escape$target_symbol, "\" target=\"_blank\">", data_escape$target_symbol, "</a>"), NA)
+                    data_escape$target_entrez <- ifelse(data_escape$target_entrez != "NA", paste0("<a href=\"", "https://www.ncbi.nlm.nih.gov/gene/", data_escape$target_entrez,"\" target=\"_blank\">", data_escape$target_entrez, "</a>"), NA)
+                    data_escape$target_ensembl <- ifelse(data_escape$target_ensembl != "NA", paste0("<a href=\"", "https://www.ensembl.org/", organism, "/Gene/Summary?db=core;g=", data_escape$target_ensembl, "\" target=\"_blank\">", data_escape$target_ensembl, "</a>"), NA)
+                    data_escape$paper_pubmedID <- ifelse(data_escape$database != "mir2disease", paste0("<a href=\"", "https://pubmed.ncbi.nlm.nih.gov/", data_escape$paper_pubmedID, "\" target=\"_blank\">", data_escape$paper_pubmedID, "</a>"), data_escape$paper_pubmedID)
+                    
+                    colnames(data_escape) <- c("Database", "Mature miRNA id", "Target gene", "Entrez", "Ensembl", "Disease drug", "Pubmed", "Type")
+                
+                    data_escape <- data_escape[order(Database),]
+                
+                
+                    datatable(data = data_escape,
+                              rownames = F,
+                              style = "bootstrap",
+                              class = "compact display",
+                              caption = "MiRNA-target gene interactions associated with drugs or diseases. MiRNAs are linked to miRBase, target genes are linked to GeneCards.",
+                              fillContainer = F,
+                              autoHideNavigation = T,
+                              filter = "top",
+                              escape = FALSE,
+                              extensions = c('ColReorder', 'Buttons', 'KeyTable', 'RowGroup'),
+                              options = list(colReorder = TRUE,
+                                             searching = TRUE,
+                                             pageLength = 10,
+                                             dom = 'Bfrtip',
+                                             buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                             keys = TRUE,
+                                             rowGroup = list(dataSrc = 0)
+                                            )
+                            )
+                    
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+
+
+## Over-Representation Analysis (ORA)
+
+```{r pre_ORA, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                data(geneList)
+            
+                eg <- bitr(target_genes, fromType="SYMBOL", toType="ENTREZID", OrgDb=params$orgdb)
+                
+            }
+            
+        }
+        
+    }
+
+}
+
+```
+
+### Disease analysis
+
+```{r disease_association, echo=FALSE, include=TRUE, fig.width=10, fig.height=7}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa") {   # only "human" allowed
+    
+            # identifying disease association of interesting genes
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                do <- enrichDO(gene          = eg$ENTREZID,
+                              ont           = "DO",
+                              pvalueCutoff  = 0.05,
+                              pAdjustMethod = "BH",
+                              minGSSize     = 5,
+                              maxGSSize     = 500,
+                              qvalueCutoff  = 0.05,
+                              readable      = TRUE)
+                
+                do@result <- do@result[do@result$p.adjust < 0.05,]
+                
+                
+                if ( dim(do@result)[1] > 0 ) {
+                    
+                    do <- pairwise_termsim(do)
+                    
+                    ema_plot <- emapplot(do,
+                                         showCategory = 20,
+                                         repel = TRUE,
+                                         node_label = "all",
+                                         pie_scale = 1.5,
+                                         layout = "kk") + 
+                        
+                                ggtitle("Disease association of target genes",
+                                        subtitle = "The 20 most significant terms are shown") +
+                        
+                                theme(plot.title = element_text(hjust = 0.5),
+                                      plot.subtitle = element_text(hjust = 0.5))
+                    
+                    print(ema_plot)
+                
+                
+                    # Save at png
+                    ggsave(ema_plot, file=paste0(output_dir, "Disease_association_of_target_genes.png"), width=10, height=7, dpi = 600)
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r enrich_cancer, echo=FALSE, include=TRUE, fig.width=8, fig.height=5}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa") {   # only "human" allowed
+            
+            # analyzing gene list and determine whether they are enriched in genes known to be mutated in a given cancer type
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+            
+                ncg <- enrichNCG(gene          = eg$ENTREZID,
+                                 pvalueCutoff  = 0.05,
+                                 pAdjustMethod = "BH",
+                                 minGSSize     = 10,
+                                 maxGSSize     = 500,
+                                 qvalueCutoff  = 0.2,
+                                 readable      = TRUE)
+                
+                ncg@result <- ncg@result[ncg@result$p.adjust < 0.05,]
+                
+                
+                if ( dim(ncg@result)[1] > 0 ) {
+                
+                    up_plot <- upsetplot(ncg) + 
+                        
+                               ggtitle("Target genes enriched in genes mutated in cancer") +
+                        
+                               theme(plot.title = element_text(hjust = 0.5))
+                    
+                    print(up_plot)
+                    
+                    
+                    # Save at png
+                    ggsave(up_plot, file=paste0(output_dir, "Target_genes_enriched_in_genes_mutated_in_cancer.png"), width=8, height=5, dpi = 600)
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r disgenet, echo=FALSE, include=TRUE, fig.width=8, fig.height=6}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa") {   # only "human" allowed
+            
+            # enrichment analysis of disease-gene associations (DisGeNET)
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                dgn <- enrichDGN(gene          = eg$ENTREZID,
+                                 pvalueCutoff  = 0.05,
+                                 pAdjustMethod = "BH",
+                                 minGSSize     = 10,
+                                 maxGSSize     = 500,
+                                 qvalueCutoff  = 0.2,
+                                 readable      = TRUE)
+                
+                dgn@result <- dgn@result[dgn@result$p.adjust < 0.05,]
+                
+                
+                if ( dim(dgn@result)[1] > 0 ) {
+                
+                    dot_plot <- dotplot(dgn,
+                                        showCategory = 20,
+                                        orderBy = "Description") + 
+                        
+                                ggtitle("Enrichment analysis of disease-gene associations (DisGeNET)",
+                                        subtitle = "The 20 most significant terms are shown") +
+                        
+                                theme(plot.title = element_text(hjust = 0.5),
+                                      plot.subtitle = element_text(hjust = 0.5))
+                    
+                    print(dot_plot)
+                    
+                    
+                    # Save at png
+                    ggsave(dot_plot, file=paste0(output_dir, "Enrichment_analysis_of_disease_gene_associations.png"), width=8, height=6, dpi = 600)
+                
+                }
+            
+            }
+        
+        }
+
+    }
+
+}
+
+```
+
+```{r table_disease_association, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+
+        if (parameters[2] == "hsa") {
+    
+            # identifying disease association of interesting genes
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+            
+                if ( dim(do@result)[1] > 0 ) {
+                    
+                    do_table <- data.table(do@result[, c(1,2,3,4)], round(do@result[, c(5,6,7)],5), do@result[, c(8,9)])
+    
+                    
+                    # Save table
+                    write.csv(do_table, paste0(output_dir, "miRNA_Disease_association_of_target_genes.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r table_enrich_cancer, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa") {
+    
+            # analyzing gene list and determine whether they are enriched in genes known to be mutated in a given cancer type
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(ncg@result)[1] > 0 ) {
+                    
+                    ncg_table <- data.table(ncg@result[, c(1,2,3,4)], round(ncg@result[, c(5,6,7)],5), ncg@result[, c(8,9)])
+                    
+                    
+                    # Save table
+                    write.csv(ncg_table, paste0(output_dir, "miRNA_Target_genes_enriched_in_genes_known_to_be_mutated_in_cancer.csv"))
+                
+                }
+            
+            }
+    
+        }
+
+    }
+}
+
+```
+
+```{r table_disgenet, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa") {
+            
+            # enrichment analysis of disease-gene associations (DisGeNET)
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(dgn@result)[1] > 0 ) {
+                    
+                    dgn_table <- data.table(dgn@result[, c(1,2,3,4)], round(dgn@result[, c(5,6,7)],5), dgn@result[, c(8,9)])
+                    
+    
+                    # Save table
+                    write.csv(dgn_table, paste0(output_dir, "miRNA_Enrichment_analysis_of_disease_gene_associations.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r print_2, echo=FALSE, include=FALSE}
+
+print_2 <- ""
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                print_2 <- "Disease analysis tables are saved in \"miRNA_Disease_association_of_target_genes.csv\", \"miRNA_Target_genes_enriched_in_genes_known_to_be_mutated_in_cancer.csv\", and \"miRNA_Enrichment_analysis_of_disease_gene_associations.csv\" files, respectively."
+    
+            }
+        
+        }
+
+    }
+    
+}
+
+```
+
+`r print_2`
+
+
+### Gene Ontology analysis
+
+```{r functional_profile, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+            
+            # functional profile of a gene set at specific GO level
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                # molecular function
+                ggoMF2 <- groupGO(gene  = eg$ENTREZID,
+                               OrgDb    = params$orgdb,
+                               keyType  = "ENTREZID",
+                               ont      = "MF",
+                               level    = 2,
+                               readable = TRUE)
+                
+                ggoMF2@result <- ggoMF2@result[ggoMF2@result$Count > 0,]
+                
+                
+                # biological process
+                ggoBP2 <- groupGO(gene  = eg$ENTREZID,
+                               OrgDb    = params$orgdb,
+                               keyType  = "ENTREZID",
+                               ont      = "BP",
+                               level    = 2,
+                               readable = TRUE)
+                
+                ggoBP2@result <- ggoBP2@result[ggoBP2@result$Count > 0,]
+                
+                
+                # cellular component
+                ggoCC2 <- groupGO(gene  = eg$ENTREZID,
+                               OrgDb    = params$orgdb,
+                               keyType  = "ENTREZID",
+                               ont      = "CC",
+                               level    = 2,
+                               readable = TRUE)
+                
+                ggoCC2@result <- ggoCC2@result[ggoCC2@result$Count > 0,]
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r pre_plot_functional_profile, echo=FALSE, include=FALSE}
+
+N <- 0
+w <- 1
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+            
+                if ( dim(ggoMF2@result)[1] > 0 ) {
+                
+                    plot_MF2 <- ggplot(ggoMF2, aes(x = GeneRatio, y = Description)) +
+                        
+                                geom_point(aes(size = Count), fill = "red", shape = 21) +
+                        
+                                ggtitle("GO Molecular function") +
+                    
+                                theme(legend.key=element_blank(),
+                                        plot.title = element_text(family = "Arial", size = 14, hjust = 0.5),
+                                        axis.text.x = element_text(colour = "black", size = 12, angle = 0, hjust = 0.5), 
+                                        axis.text.y = element_text(colour = "black", size = 12), 
+                                        legend.text = element_text(size = 12, colour ="black"), 
+                                        legend.title = element_text(size = 12),
+                                        legend.box.background = element_rect(),
+                                        panel.border = element_rect(colour = "darkgray", fill = NA, size = 1), 
+                                        legend.position = "bottom"
+                                        )
+                
+                }
+            
+            
+                if ( dim(ggoBP2@result)[1] > 0 ) {
+                    
+                    plot_BP2 <- ggplot(ggoBP2, aes(x = GeneRatio, y = Description)) +
+                        
+                                geom_point(aes(size = Count), fill = "green", shape = 21) +
+    
+                                ggtitle("GO Biological process") +
+                    
+                                theme(legend.key=element_blank(),
+                                        plot.title = element_text(family = "Arial", size = 14, hjust = 0.5),
+                                        axis.text.x = element_text(colour = "black", size = 12, angle = 0, hjust = 0.5), 
+                                        axis.text.y = element_text(colour = "black", size = 12), 
+                                        legend.text = element_text(size = 12, colour ="black"), 
+                                        legend.title = element_text(size = 12),
+                                        legend.box.background = element_rect(),
+                                        panel.border = element_rect(colour = "darkgray", fill = NA, size = 1), 
+                                        legend.position = "bottom"
+                                        )
+                
+                }
+            
+            
+                if ( dim(ggoCC2@result)[1] > 0 ) {
+                
+                    plot_CC2 <- ggplot(ggoCC2, aes(x = GeneRatio, y = Description)) +
+                    
+                                geom_point(aes(size = Count), fill = "blue", shape = 21) +
+    
+                                ggtitle("GO Cellular component") +
+                    
+                                theme(legend.key=element_blank(),
+                                        plot.title = element_text(family = "Arial", size = 14, hjust = 0.5),
+                                        axis.text.x = element_text(colour = "black", size = 12, angle = 0, hjust = 0.5), 
+                                        axis.text.y = element_text(colour = "black", size = 12), 
+                                        legend.text = element_text(size = 12, colour ="black"), 
+                                        legend.title = element_text(size = 12),
+                                        legend.box.background = element_rect(),
+                                        panel.border = element_rect(colour = "darkgray", fill = NA, size = 1), 
+                                        legend.position = "bottom"
+                                        )
+                
+                }
+            
+                
+                if ( dim(ggoMF2@result)[1] > 0 ) {
+                    
+                    if ( dim(ggoBP2@result)[1] > 0 ) {
+                        
+                        if ( dim(ggoCC2@result)[1] > 0 ) {
+                            
+                            grid_plot <- plot_grid(plot_MF2, plot_BP2, plot_CC2, ncol=3, rel_widths = c(1,1,1))
+                            N <- 3
+                            
+                        } else {
+                            
+                            grid_plot <- plot_grid(plot_MF2, plot_BP2, ncol=2, rel_widths = c(1,1))
+                            N <- 2
+                            
+                        }
+                        
+                    } else {
+                        
+                        if ( dim(ggoCC2@result)[1] > 0 ) {
+                            
+                            grid_plot <- plot_grid(plot_MF2, plot_CC2, ncol=2, rel_widths = c(1,1))
+                            N <- 2
+                            
+                        } else {
+                            
+                            grid_plot <- plot_MF2
+                            N <- 1
+                            
+                        }
+                        
+                    }
+                    
+                } else {
+                    
+                    if ( dim(ggoBP2@result)[1] > 0 ) {
+                        
+                        if ( dim(ggoCC2@result)[1] > 0 ) {
+                            
+                            grid_plot <- plot_grid(plot_BP2, plot_CC2, ncol=2, rel_widths = c(1,1))
+                            N <- 2
+                            
+                        } else {
+                            
+                            grid_plot <- plot_BP2
+                            N <- 1
+                            
+                        }
+                        
+                    } else {
+                        
+                        if ( dim(ggoCC2@result)[1] > 0 ) {
+                            
+                            grid_plot <- plot_CC2
+                            N <- 1
+                            
+                        }
+                        
+                    }
+                    
+                }
+                
+                w <- 7*N
+                
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r plot_functional_profile, echo=FALSE, include=TRUE, fig.width=w, fig.height=7}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+    
+                if (N > 0) {
+                    
+                    print(grid_plot)
+                
+                    # Save at png
+                    ggsave(grid_plot, file=paste0(output_dir, "GO_functional_profile.png"), width=w, height=7, dpi = 600)
+                
+                }
+    
+            }
+            
+        }
+        
+    }
+    
+}
+
+```
+
+```{r table_GO_MF, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # GO molecular function
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(ggoMF2@result)[1] > 0 ) {
+                
+                    ggoMF2_table <- as.data.table(ggoMF2@result)
+                    ggoMF2_table <- ggoMF2_table[order(-Count),]
+    
+                    
+                    # Save table
+                    write.csv(ggoMF2_table, paste0(output_dir, "miRNA_GO_molecular_function.csv"))
+                
+                }
+            
+            }
+            
+        }
+        
+    }
+
+}
+
+```
+
+```{r table_GO_BP, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # GO biological process
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(ggoBP2@result)[1] > 0 ) {
+                
+                    ggoBP2_table <- as.data.table(ggoBP2@result)
+                    ggoBP2_table <- ggoBP2_table[order(-Count),]
+    
+                    
+                    # Save table
+                    write.csv(ggoBP2_table, paste0(output_dir, "miRNA_GO_biological_process.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r table_GO_CC, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # GO cellular component
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(ggoCC2@result)[1] > 0 ) {
+                
+                    ggoCC2_table <- as.data.table(ggoCC2@result)
+                    ggoCC2_table <- ggoCC2_table[order(-Count),]
+                    
+    
+                    # Save table
+                    write.csv(ggoCC2_table, paste0(output_dir, "miRNA_GO_cellular_component.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r print_3, echo=FALSE, include=FALSE}
+
+print_3 <- ""
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                print_3 <- "Gene ontology analysis tables are saved in \"miRNA_GO_molecular_function.csv\", \"miRNA_GO_biological_process.csv\", and \"miRNA_GO_cellular_component.csv\" files, respectively."
+    
+            }
+        
+        }
+
+    }
+    
+}
+
+```
+
+`r print_3`
+
+```{r over_representation_test, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # over-representation test
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                # molecular function
+                egoMF <- enrichGO(gene        = eg$ENTREZID,
+                                OrgDb         = params$orgdb,
+                                keyType       = 'ENTREZID',
+                                ont           = "MF",
+                                pAdjustMethod = "BH",
+                                pvalueCutoff  = 0.05,
+                                qvalueCutoff  = 0.05,
+                                readable      = TRUE)
+                
+                egoMF@result <- egoMF@result[egoMF@result$p.adjust < 0.05,]
+                
+                
+                # biological process
+                egoBP <- enrichGO(gene        = eg$ENTREZID,
+                                OrgDb         = params$orgdb,
+                                keyType       = 'ENTREZID',
+                                ont           = "BP",
+                                pAdjustMethod = "BH",
+                                pvalueCutoff  = 0.05,
+                                qvalueCutoff  = 0.05,
+                                readable      = TRUE)
+                
+                egoBP@result <- egoBP@result[egoBP@result$p.adjust < 0.05,]
+                
+                
+                # cellular component
+                egoCC <- enrichGO(gene        = eg$ENTREZID,
+                                OrgDb         = params$orgdb,
+                                keyType       = 'ENTREZID',
+                                ont           = "CC",
+                                pAdjustMethod = "BH",
+                                pvalueCutoff  = 0.05,
+                                qvalueCutoff  = 0.05,
+                                readable      = TRUE)
+                
+                egoCC@result <- egoCC@result[egoCC@result$p.adjust < 0.05,]
+                
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r plot_or_MF, echo=FALSE, include=TRUE, fig.width=10, fig.height=7}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(egoMF@result)[1] > 0 ) {
+                    
+                    egoMF_plot <- goplot(egoMF,
+                                         showCategory = 10) + 
+                        
+                                  ggtitle("Over-representation test MF",
+                                          subtitle = "The 10 most significant terms are shown") +
+                        
+                                  theme(plot.title = element_text(hjust = 0.5),
+                                        plot.subtitle = element_text(hjust = 0.5))
+                    
+                    print(egoMF_plot)
+                    
+                    
+                    # Save at png
+                    ggsave(egoMF_plot, file=paste0(output_dir, "Over_representation_test_MF.png"), width=10, height=7, dpi = 600)
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r plot_or_BP, echo=FALSE, include=TRUE, fig.width=10, fig.height=7}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(egoBP@result)[1] > 0 ) {
+                
+                    egoBP_plot <- goplot(egoBP,
+                                         showCategory = 10) + 
+                        
+                                  ggtitle("Over-representation test BP",
+                                          subtitle = "The 10 most significant terms are shown") +
+                        
+                                  theme(plot.title = element_text(hjust = 0.5),
+                                        plot.subtitle = element_text(hjust = 0.5))
+                    
+                    print(egoBP_plot)
+                    
+                    
+                    # Save at png
+                    ggsave(egoBP_plot, file=paste0(output_dir, "Over_representation_test_BP.png"), width=10, height=7, dpi = 600)
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r plot_or_CC, echo=FALSE, include=TRUE, fig.width=10, fig.height=7}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(egoCC@result)[1] > 0 ) {
+                
+                    egoCC_plot <- goplot(egoCC,
+                                         showCategory = 10) + 
+                        
+                                  ggtitle("Over-representation test CC",
+                                          subtitle = "The 10 most significant terms are shown") +
+                        
+                                  theme(plot.title = element_text(hjust = 0.5),
+                                        plot.subtitle = element_text(hjust = 0.5))
+                    
+                    print(egoCC_plot)
+                    
+                    
+                    # Save at png
+                    ggsave(egoCC_plot, file=paste0(output_dir, "Over_representation_test_CC.png"), width=10, height=7, dpi = 600)
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r table_or_MF, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+            
+            # over-representation molecular function
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+            
+                if ( dim(egoMF@result)[1] > 0 ) {
+                
+                    egoMF_table <- data.table(egoMF@result[, c(1,2,3,4)], round(egoMF@result[, c(5,6,7)],5), egoMF@result[, c(8,9)])
+                    
+    
+                    # Save table
+                    write.csv(egoMF_table, paste0(output_dir, "miRNA_over_representation_test_molecular_function.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r table_or_BP, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # over-representation biological process
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(egoBP@result)[1] > 0 ) {
+                
+                    egoBP_table <- data.table(egoBP@result[, c(1,2,3,4)], round(egoBP@result[, c(5,6,7)],5), egoBP@result[, c(8,9)])
+                    
+    
+                    # Save table
+                    write.csv(egoBP_table, paste0(output_dir, "miRNA_over_representation_test_biological_process.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r table_or_CC, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # over-representation cellular component
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(egoCC@result)[1] > 0 ) {
+                
+                    egoCC_table <- data.table(egoCC@result[, c(1,2,3,4)], round(egoCC@result[, c(5,6,7)],5), egoCC@result[, c(8,9)])
+                    
+    
+                    # Save table
+                    write.csv(egoCC_table, paste0(output_dir, "miRNA_over_representation_test_cellular_component.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r print_4, echo=FALSE, include=FALSE}
+
+print_4 <- ""
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                print_4 <- "Over-representation test analysis tables are saved in \"miRNA_over_representation_test_molecular_function.csv\", \"miRNA_over_representation_test_biological_process.csv\", and \"miRNA_over_representation_test_cellular_component.csv\" files, respectively."
+    
+            }
+        
+        }
+
+    }
+    
+}
+
+```
+
+`r print_4`
+
+
+### KEGG analysis
+
+```{r KEGG_over_representation_test, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+    
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+        
+            # KEGG over-representation test
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                dt <- tibble::column_to_rownames(parameters[2], "V1")
+                orgk <- rownames(dt)
+                
+                kk <- enrichKEGG(gene              = eg$ENTREZID,
+                                 organism          = orgk,
+                                 keyType           = "ncbi-geneid",
+                                 pvalueCutoff      = 0.05,
+                                 pAdjustMethod     = "BH",
+                                 minGSSize         = 10,
+                                 maxGSSize         = 500,
+                                 qvalueCutoff      = 0.2,
+                                 use_internal_data = FALSE)
+                
+                kk@result <- kk@result[kk@result$p.adjust < 0.05,]
+    
+    
+                browseKEGG(kk, kk@result$ID[1])
+                browseKEGG(kk, kk@result$ID[2])
+                browseKEGG(kk, kk@result$ID[3])
+                browseKEGG(kk, kk@result$ID[4])
+                browseKEGG(kk, kk@result$ID[5])
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r print_5, echo=FALSE, include=FALSE}
+
+print_5 <- ""
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+    
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                #print_5 <- "KEGG analysis result for the first 5 more significant terms is open as HTML pages."
+    
+            }
+        
+        }
+
+    }
+    
+}
+
+```
+
+`r print_5`
+
+```{r table_KEGG_or_test, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # KEGG over-representation test
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                kk_table <- data.table(kk@result[, c(1,2,3,4)], round(kk@result[, c(5,6,7)],5), kk@result[, c(8,9)])
+    
+                
+                # Save table
+                write.csv(kk_table, paste0(output_dir, "miRNA_KEGG_over_representation_test.csv"))
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r print_6, echo=FALSE, include=FALSE}
+
+print_6 <- ""
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+    
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                print_6 <- "KEGG over-representation test analysis table is saved in \"miRNA_KEGG_over_representation_test.csv\" file."
+    
+            }
+        
+        }
+
+    }
+    
+}
+
+```
+
+`r print_6`
+
+
+### Reactome pathway analysis
+
+```{r reactome_analysis, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            ## Reactome pathway analysis
+            
+            # Reactome over-representation test
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+    
+                organism <- case_when(
+                                 parameters[2] == "hsa" ~ "human",
+                                 parameters[2] == "mmu" ~ "mouse",
+                                 parameters[2] == "rno" ~ "rat"
+                                    )
+    
+                reac <- enrichPathway(gene              = eg$ENTREZID,
+                                      organism          = organism,
+                                      pvalueCutoff      = 0.05,
+                                      pAdjustMethod     = "BH",
+                                      minGSSize         = 10,
+                                      maxGSSize         = 500,
+                                      qvalueCutoff      = 0.2,
+                                      readable = TRUE)
+    
+                reac@result <- reac@result[reac@result$p.adjust < 0.05,]
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r plot_reactome_analysis, echo=FALSE, include=TRUE, fig.width=10, fig.height=8}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(reac@result)[1] > 0 ) {
+                    
+                    reac <- pairwise_termsim(reac)
+                    
+                    ema_plot <- emapplot(reac,
+                                         showCategory = 20) + 
+                        
+                                ggtitle("Reactome pathway analysis",
+                                        subtitle = "The 20 most significant terms are shown") +
+                        
+                                theme(plot.title = element_text(hjust = 0.5),
+                                      plot.subtitle = element_text(hjust = 0.5))
+                    
+    
+                    print(ema_plot)
+                    
+                    
+                    # Save at png
+                    ggsave(ema_plot, file=paste0(output_dir, "Reactome_pathway_analysis.png"), width=10, height=8, dpi = 600)
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r table_reactome_analysis, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            # Reactome over-representation test
+            
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                if ( dim(reac@result)[1] > 0 ) {
+                
+                    reac_table <- data.table(reac@result[, c(1,2,3,4)], round(reac@result[, c(5,6,7)],5), reac@result[, c(8,9)])
+                    
+    
+                    # Save table
+                    write.csv(reac_table, paste0(output_dir, "miRNA_Reactome_pathway_analysis.csv"))
+                
+                }
+            
+            }
+            
+        }
+
+    }
+    
+}
+
+```
+
+```{r print_7, echo=FALSE, include=FALSE}
+
+print_7 <- ""
+
+if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+
+    if (miRNA_pred[, .N] > 0) {
+        
+        if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+    
+            if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+                
+                print_7 <- "Reactome pathway analysis table is saved in \"miRNA_Reactome_pathway_analysis.csv\" file."
+    
+            }
+        
+        }
+
+    }
+    
+}
+
+```
+
+`r print_7`
+
+
+
+
+```{r mesh_analysis, echo=FALSE, include=TRUE}
+
+### MeSH enrichment analysis
+
+
+
+# if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+# 
+#     if (miRNA_pred[, .N] > 0) {
+# 
+#         if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+#     
+#             ## MeSH enrichment analysis
+#     
+#             # MeSH over-representation test
+#     
+#             if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+#     
+#                 mesh <- enrichMeSH(eg$ENTREZID,
+#                                 MeSHDb = params$meshdb,
+#                                 database='gendoo',
+#                                 category = 'C')   # Diseases
+#     
+#                 mesh@result <- mesh@result[mesh@result$p.adjust < 0.05,]
+#     
+#             }
+#     
+#         }
+# 
+#     }
+#     
+# }
+
+```
+
+```{r plot_mesh_analysis, echo=FALSE, include=TRUE, fig.width=10, fig.height=8}
+
+# if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+# 
+#     if (miRNA_pred[, .N] > 0) {
+#     
+#         if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+#     
+#             if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+#     
+#                 if ( dim(mesh@result)[1] > 0 ) {
+#     
+#                     mesh_plot <- emapplot(mesh,
+#                                          showCategory = 20) +
+#     
+#                                 ggtitle("MeSH enrichment analysis",
+#                                         subtitle = "The 20 most significant terms are shown") +
+#     
+#                                 theme(plot.title = element_text(hjust = 0.5),
+#                                       plot.subtitle = element_text(hjust = 0.5))
+#     
+#                     print(mesh_plot)
+#     
+#     
+#                     # Save at png
+#                     ggsave(mesh_plot, file=paste0(output_dir, "MeSH_enrichment_analysis.png"), width=10, height=8, dpi = 600)
+#     
+#                 }
+#     
+#             }
+#     
+#         }
+# 
+#     }
+#     
+# }
+
+```
+
+```{r table_mesh_analysis, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+# if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+# 
+#     if (miRNA_pred[, .N] > 0) {
+# 
+#         if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+#     
+#             # MesH over-representation test
+#     
+#             if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+#     
+#                 if ( dim(mesh@result)[1] > 0 ) {
+#     
+#                     mesh_table <- data.table(mesh@result[, c(1,2,3,4)], round(mesh@result[, c(5,6,7)],5), mesh@result[, c(8,9)])
+#     
+#     
+#                     # Save table
+#                     write.csv(mesh_table, paste0(output_dir, "miRNA_MeSH_enrichment_analysis.csv"))
+#     
+#                 }
+#     
+#             }
+#     
+#         }
+# 
+#     }
+#     
+# }
+
+```
+
+```{r print_8, echo=FALSE, include=FALSE}
+
+print_8 <- ""
+
+# if (parameters[1] == "M" | parameters[1] == "MR" | parameters[1] == "MO" | parameters[1] == "MRO") {
+# 
+#     if (miRNA_pred[, .N] > 0) {
+#         
+#         if (parameters[2] == "hsa" | parameters[2] == "mmu" | parameters[2] == "rno") {
+#     
+#             if (length(miRNA_id) > 0 & multimir_results[, .N] != 0 & length(target_genes) > 0) {
+#     
+#                 print_8 <- "Mesh enrichment analysis table is saved in \"miRNA_MeSH_enrichment_analysis.csv\" file."
+#     
+#             }
+#     
+#         }
+# 
+#     }
+#     
+# }
+
+```
+
+`r print_8`
+
+
+
+
+
+# RBP binding sites predictions
+
+```{r print_9, echo=FALSE, include=FALSE}
+
+print_9 <- "Analysis not performed."
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    print_9 <- ""
+
+}
+
+```
+
+`r print_9`
+
+```{r circular_barplot_RBP, echo=FALSE, include=TRUE, fig.width=10, fig.height=10}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # Create dataset
+    data <- barP
+    
+    if (data[,.N] > 0) {
+    
+    	n <- max(data[, .N, by = circ_start]$N)
+    	l <- circ_length[circ_id == params$circ]$length
+    
+    
+    	# Get the name and the y position of each label
+    	label_data <- data
+    	# calculate the ANGLE of the labels
+    	number_of_bar <- l
+    	angle <- 90 - 360 * (label_data$circ_start-0.5) / number_of_bar
+    	label_data$hjust <- ifelse(angle < -90, 1, 0)
+    	# flip angle BY to make them readable
+    	label_data$angle <- ifelse(angle < -90, angle+180, angle)
+    	label_data[hjust == 1, "hjust"] <- 0
+    
+    
+    	# Prepare a data frame for grid (scales)
+    	grid_data <- data.table("start" = 0,
+    	                        "end" = l)
+    
+    	# Make the plot
+    	circ_plot <- ggplot(data, aes(x = circ_start, y = 1)) +
+        
+    	            geom_bar(aes(x = circ_start, y = 1), fill=alpha("#E65100", 0.7), stat="identity", alpha=0.5, width=l*3/500) +
+
+            	    # Add lines
+                    geom_segment(data=grid_data, aes(x = start+4, y = 0, xend = end-4, yend = 0), colour = "darkgrey", alpha=1, size=2.5, inherit.aes = FALSE ) +                             
+                    geom_segment(data=grid_data, aes(x = end-4, y = 0, xend = end, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) +                                    
+                    geom_segment(data=grid_data, aes(x = start, y = 0, xend = start+4, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) + 
+    
+    	            # Add text
+    	            annotate("text", x = 20, y = -0.12, label = "bks", color = "black", size = 3, fontface = "bold", hjust=1) +
+    	            
+    	            ylim(-1, n+1.5) +
+        
+    	            theme_minimal() +
+    	            theme(
+    	                legend.position = "none",
+    	                text = element_text(size=8),
+    	                axis.title = element_blank(),
+    	                axis.text.x = element_text(angle=0, hjust=1),
+    	                axis.text.y = element_text(angle=0, hjust=12.7, vjust=-0.3)
+    	              ) +
+    
+    	            coord_polar(start = 0) +
+    
+    	            # Add labels on top of each bar
+    	            geom_text_repel(data = label_data, aes(x = circ_start, y = n+0.1, label = RBP, hjust = hjust),
+    	                            color="black",
+    	                            fontface="bold",
+    	                            alpha=0.6, 
+    	                            size=2.5,
+    	                            angle=angle,
+    	                            inherit.aes = FALSE,
+    	                            max.overlaps = 50)
+    
+    	print(circ_plot)
+    
+    
+    	# Save at png
+    	ggsave(circ_plot, file=paste0(output_dir, "circplot_RBP.png"), width=10, height=10, dpi = 600)
+    
+    }
+
+}
+
+```
+
+```{r pre_table_RBP_binding_sites, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    setkey(barP, circ_id)
+    setkey(gene_names, circ_id)
+    barP <- barP[gene_names, nomatch = 0]
+
+} else {
+    
+    barP <- data.table(RBP = integer())
+    
+}
+
+```
+
+Number of different identified RBPs: `r length(unique(barP$RBP))`.
+
+
+```{r table_RBP_binding_sites, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    data_escape <- barP
+    
+    if (data_escape[,.N] > 0){
+    
+    	require(params$orgdb, character.only = TRUE)
+    	tab <- toTable(eval(parse(text = params$symbol2eg)))
+    	tab <- as.data.table(tab)
+    
+    	colnames(data_escape)[2] <- "symbol"
+    
+    	setkey(data_escape, symbol)
+    	setkey(tab, symbol)
+    	data_escape <- merge(data_escape, tab, all.x=T)
+    
+    	tabU <- toTable(eval(parse(text = params$eg2uniprot)))
+    	tabU <- as.data.table(tabU)
+    	tabU$uniprot_id <- paste0("<a href=\"", "https://www.uniprot.org/uniprot/", tabU$uniprot_id, "\" target=\"_blank\">", tabU$uniprot_id, "</a>")
+    	tabU <- tabU[, .(list(uniprot_id)), by = gene_id]
+    	colnames(tabU)[2] <- "uniprot_id"
+    
+    	setkey(data_escape, gene_id)
+    	setkey(tabU, gene_id)
+    	data_escape <- merge(data_escape, tabU, all.x=T)
+    
+    	data_escape$gene_names <- paste0("<a href=\"", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=", data_escape$gene_names, "\" target=\"_blank\">", data_escape$gene_names, "</a>")
+    
+    	data_escape <- data_escape[, -"gene_id"]
+    	data_escape <- data_escape[, -"bind_or_not"]
+    	data_escape <- data_escape[, -"circ_RBP_start_id"]
+    	colnames(data_escape)[1] <- "RBP"
+    
+    	data_escape <- data_escape[, c(2,7,1,3,4,5,6,8)]   # change column order
+    
+    	data_escape <- data_escape[order(-voteFrac),]
+    
+    
+    	datatable(data = data_escape,
+            	  rownames = F,
+            	  colnames = c("CircRNA", "Gene names", "RBP", "PWM", "CircRNA start position", "Site length", "voteFrac", "Uniprot"),
+            	  style = "bootstrap",
+            	  class = "compact display",
+            	  caption = paste0("Predicted RBP binding sites. CircRNA host gene name is linked to GeneCards, RBP is linked to UniProt. Filters are based on highlighted column (voteFrac > ", voteFrac_RBP, "). Best predictions are obtained with higher voteFrac values; the recommeded threshold is 0.15."),
+            	  fillContainer = F,
+            	  autoHideNavigation = T,
+            	  filter = "top",
+            	  escape = FALSE,
+            	  extensions = c('ColReorder', 'Buttons', 'KeyTable'),
+            	  options = list(colReorder = TRUE,
+            	                 searching = TRUE,
+            	                 pageLength = 10,
+            	                 dom = 'Bfrtip',
+            	                 buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+            	                 keys = TRUE
+            	                )
+            	) %>%
+    	    formatStyle("voteFrac", 
+                    	backgroundColor = 'lightskyblue'
+                    	)
+    
+    }
+
+}
+
+```
+
+
+
+## RBP functional information
+
+```{r, echo=FALSE, include=FALSE}
+
+### Enrichment analysis
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    Accs <- data_escape$RBP
+
+}
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+
+### Gene ontology
+
+```
+
+```{r pre_gene_ontology_RBP, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # GO
+    
+    if (barP[,.N] > 0){
+    
+    	colnames(barP)[2] <- "symbol"
+    
+    	setkey(barP, symbol)
+    	setkey(tab, symbol)
+    	barP <- merge(barP, tab, all.x=T)
+    
+    	tabU <- toTable(eval(parse(text = params$eg2uniprot)))
+    	tabU <- as.data.table(tabU)
+    
+    	setkey(barP, gene_id)
+    	setkey(tabU, gene_id)
+    	barP <- merge(barP, tabU, all.x=T)
+    
+    	ProteinAccList <- unique(barP$uniprot_id)
+    	ProteinAccList <- ProteinAccList[which(!is.na(ProteinAccList))]
+    
+    }
+
+}
+
+```
+
+
+
+### KEGG analysis
+
+```{r enrichment_KEGG, echo=FALSE, include=TRUE, fig.width=7, fig.height=5, warning=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+    
+    if (length(Accs) >= 7) {
+    
+        eKEGG <- Enrichment.KEGG(Accs,
+                                 OS=params$org,
+                                 p_value=0.05,
+                                 directorypath=NULL)
+        
+        
+        # Save at png
+        n <- dim(eKEGG$data)[1]
+        
+        if (n > 0) {
+            
+            if (n < 4) {
+                n <- 4
+            }
+            
+            ggsave(eKEGG, file=paste0(output_dir, "RBP_enrichment_KEGG.png"), width=7, height=n, dpi = 600)
+        
+        }
+        
+    }
+
+}
+
+```
+
+```{r table_KEGG_enrichment, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # enrichment KEGG
+    if (length(Accs) >= 7) {
+
+        if (n > 0) {
+        
+            eKEGG_table <- data.table(eKEGG$data[, c(9,10,11,5,4,6,12,13,3,2,7,8,15,16)])
+    
+            # Save table
+            write.csv(eKEGG_table, paste0(output_dir, "RBP_enrichment_KEGG.csv"))
+    
+        }
+        
+    }
+
+}
+
+```
+
+```{r print_10, echo=FALSE, include=FALSE}
+
+print_10 <- ""
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (length(Accs) >= 7) {
+        
+        if (n > 0) {
+            
+            print_10 <- "KEGG enrichment analysis table is saved in \"RBP_enrichment_KEGG.csv\" file."
+        
+        }
+        
+    }
+    
+}
+
+```
+
+`r print_10`
+
+
+### Reactome pathway analysis
+
+```{r enrichment_Reac, echo=FALSE, include=TRUE, fig.width=8, fig.height=5, warning=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (length(Accs) >= 7) {
+    
+        eREAC <- Enrichment.REAC(Accs,
+                      OS=params$org,
+                      p_value=0.05,
+                      directorypath=NULL)
+        
+        
+        # Save at png
+        n <- dim(eREAC$data)[1]
+        
+        if (n > 0) {
+            
+            if (n < 9) {
+                n <- 9
+            }
+            
+            ggsave(eREAC, file=paste0(output_dir, "RBP_enrichment_Reactome.png"), width=8, height=n/3, dpi = 600)
+
+        }    
+    }
+
+}
+
+```
+
+```{r table_Reac_enrichment, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # enrichment Reactome
+    if ((length(Accs) >= 7) & (n > 0)) {
+        
+        if (n > 0) {
+
+            eREAC_table <- data.table(eREAC$data[, c(9,10,11,5,4,6,12,13,3,2,7,8,15,16)])
+    
+            # Save table
+            write.csv(eREAC_table, paste0(output_dir, "RBP_enrichment_Reactome.csv"))
+            
+        }
+    }
+
+}
+
+```
+
+```{r print_11, echo=FALSE, include=FALSE}
+
+print_11 <- ""
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (length(Accs) >= 7) {
+        
+        if (n > 0) {
+            
+            print_11 <- "Reactome enrichment analysis table is saved in \"RBP_enrichment_Reactome.csv\" file."
+            
+        }
+        
+    }
+    
+}
+
+```
+
+`r print_11`
+
+
+### Disease association
+
+```{r disease_association_RBP, echo=FALSE, include=FALSE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # Get diseases associated with protein list
+    
+    if (barP[,.N] > 0){
+    
+    	PathologyObj <- GetPathology_Biotech(ProteinAccList)
+    	Diseases <- Get.diseases(PathologyObj)
+    
+    	if ( !is.null(dim(Diseases)) ) {
+        
+       		if ( dim(Diseases)[1] > 0 ) {
+       		    
+       		        b <- max(Diseases$Numberofproteins)
+       		        
+       		        Diseases$dis_name <- str_sub(Diseases$Disease, -25, -1)
+       		        Diseases$dis_name <- gsub("^.* \\(", "", Diseases$dis_name)
+       		        Diseases$dis_name <- gsub("\\)", "", Diseases$dis_name)
+
+            		dis <- ggplot(Diseases,
+                         		aes(x = dis_name, y = Numberofproteins, fill = Disease)
+                          		) +
+                         		geom_bar(stat = "identity") +
+                         		scale_fill_viridis(discrete = TRUE, option = "C") + 
+            		            scale_y_continuous(breaks=seq(0,b,1)) +
+                         		xlab("Disease") +
+                         		ylab("Number of proteins") +
+                         		ggtitle("Proteins associated to diseases") +
+                         		theme_bw() +
+                         		theme(plot.title = element_text(hjust = 0.5),
+                         		      text = element_text(size=10),
+                           		      axis.text.x = element_text(angle=45, hjust=1),
+                         		      legend.position = "none")
+        
+        
+    		        # Save at png
+            		w <- dim(Diseases)[1]
+    		        h <- b
+    		        
+    		        if (w > 0) {
+    		            
+    		            ggsave(dis, file=paste0(output_dir, "RBP_disease_association.png"), width=w+2, height=h+2, dpi = 600)
+    		            
+    		        }
+        
+    		    }
+        
+    	}
+    
+    
+    	# Save table
+    	write.csv(PathologyObj, paste0(output_dir, "RBP_disease_association.csv"))
+    
+    }
+
+}
+
+```
+
+```{r plot_disease_association_RBP, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (barP[,.N] > 0){
+    
+    	if ( !is.null(dim(Diseases)) ) {
+    
+    		if (dim(Diseases)[1] > 0) {
+        
+    	        	print(dis)
+            
+    		}
+    
+    	}
+    
+    }
+
+}
+
+```
+
+```{r print_12, echo=FALSE, include=FALSE}
+
+print_12 <- ""
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (barP[,.N] > 0){
+    		    
+        print_12 <- "RBP-disease association table is saved in \"RBP_disease_association.csv\" file."
+    
+    }
+    
+}
+
+```
+
+`r print_12`
+
+
+### Protein information
+
+```{r, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (barP[,.N] > 0){
+    
+    	# Cross-references Information
+    	CrossRefObj <- GetCross_references_Information(ProteinAccList, directorypath = NULL)   # EMBL ids
+    	# Save table
+    	write.csv(CrossRefObj, paste0(output_dir, "RBP_cross_reference_information.csv"))
+    
+    
+    	# Expression information
+    	ExpressionObj <- GetExpression(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(ExpressionObj, paste0(output_dir, "RBP_expression_information.csv"))
+    
+    
+    	# Family domain
+    	FamilyDomainsObj <- GetFamily_Domains(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(FamilyDomainsObj, paste0(output_dir, "RBP_family_domain.csv"))
+    
+    
+    	# Miscellaneous information
+    	MiscellaneousObj <- GetMiscellaneous(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(MiscellaneousObj, paste0(output_dir, "RBP_miscellaneous_information.csv"))
+    
+    
+    	# Protein Data
+    	ProteinDataObject <- GetNamesTaxa(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(ProteinDataObject, paste0(output_dir, "RBP_protein_data.csv"))
+    
+    
+    	# Protein functions
+    	ProteinFunctionObj <- GetProteinFunction(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(ProteinFunctionObj, paste0(output_dir, "RBP_protein_function.csv"))
+    
+    
+    	# Protein interactions
+    	ProteinInteractionsObj <- GetProteinInteractions(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(ProteinInteractionsObj, paste0(output_dir, "RBP_protein_interactions.csv"))
+    
+    
+    	# Post-translational modifications (PTMs)
+    	PTMProcessingObj <- GetPTM_Processing(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(PTMProcessingObj, paste0(output_dir, "RBP_post_translational_modifications.csv"))
+    
+    
+    	# Pubmed publications
+    	PublicationObj <- GetPublication(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(PublicationObj, paste0(output_dir, "RBP_publications.csv"))
+    
+    
+    	# Subcellular location
+    	SubcellularLocationObj <- GetSubcellular_location(ProteinAccList, directorypath = NULL)
+    	# Save table
+    	write.csv(SubcellularLocationObj, paste0(output_dir, "RBP_subcellular_location.csv"))
+    
+    }
+
+}
+
+```
+
+```{r table_RBP_info, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (barP[,.N] > 0){
+    
+    	dt_RBP_escape <- data.table("Information" = c("Cross-references Information", "Expression information", "Family domain", "Miscellaneous information", "Protein Data", "Protein functions", "Protein interactions", "Post-translational modifications (PTMs)", "Pubmed publications", "Subcellular location"),
+    	                     "File" = c("RBP_cross_reference_information.csv", "RBP_expression_information.csv", "RBP_family_domain.csv", "RBP_miscellaneous_information.csv", "RBP_protein_data.csv", "RBP_protein_function.csv", "RBP_protein_interactions.csv", "RBP_post_translational_modifications.csv", "RBP_publications.csv", "RBP_subcellular_location.csv"))
+    
+    
+    	#dt_RBP_escape$File <- paste0("<a href=\"", output_dir , dt_RBP_escape$File, "\" target=\"_blank\">", dt_RBP_escape$File, "</a>")
+
+
+    	datatable(data = dt_RBP_escape,
+    	          rownames = F,
+    	          style = "bootstrap",
+    	          class = "compact display",
+    	          caption = paste0("Name of tables with protein expression, functional and miscellaneous information."),
+    	          fillContainer = F,
+    	          autoHideNavigation = T,
+    	          filter = "top",
+    	          escape = FALSE,
+    	          extensions = c('ColReorder', 'Buttons', 'KeyTable'),
+    	          options = list(colReorder = TRUE,
+    	                         searching = TRUE,
+    	                         pageLength = 10,
+    	                         dom = 'Bfrtip',
+    	                         buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+    	                         keys = TRUE
+    	                        )
+    	        )
+    
+    }
+
+}
+
+```
+
+```{r, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "R" | parameters[1] == "MR" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    colnames(barP)[2] <- "RBP"
+
+}
+
+```
+
+
+
+
+
+# ORF predictions
+
+```{r print_13, echo=FALSE, include=FALSE}
+
+print_13 <- "Analysis not performed."
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+    
+    print_13 <- ""
+
+}
+
+```
+
+`r print_13`
+
+```{r print_14, echo=FALSE, include=FALSE}
+
+print_14 <- ""
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+    
+    if (ORFfinder_pred_l_circ[, .N] >= 1) {
+    
+        print_14 <- "The longest ORF with a stop codon is plotted. The circRNA is depicted with a gray circular line, the backsplice junction (_bks_) is printed in black. \"_nt before bks_\": nucleotide sequence from 5'-start to the backsplice junction (in orange), \"_nt after bks_\": nucleotide sequence from the backsplice junction to 3'-end (in dark red)."
+
+    }
+    
+}
+
+```
+
+`r print_14`
+
+```{r circular_barplot_ORF, echo=FALSE, include=TRUE, fig.width=10, fig.height=10}
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # only the longest ORF with stop codon
+    
+    if (ORFfinder_pred_l_circ[, .N] >= 1) {
+    
+        # Create dataset
+        ORFfinder_pred_l_circ_best$circ_id2 <- gsub(":", "_", ORFfinder_pred_l_circ_best$circ_id)
+        ORFfinder_pred_l_circ_best$start2 <- ORFfinder_pred_l_circ_best$start -1
+        ORFfinder_pred_l_circ_best$end2 <- ORFfinder_pred_l_circ_best$end -1
+        
+        ORFfinder_pred_l_circ_best$ORF_id <- paste0(ORFfinder_pred_l_circ_best$circ_id2, ":", ORFfinder_pred_l_circ_best$start2, ":", ORFfinder_pred_l_circ_best$end2)
+
+        data <- ORFfinder_pred_l_circ_best
+        
+        
+        n <- max(data[, .N, by = circ_id]$N)
+        l <- circ_length[circ_id == params$circ]$length
+        
+        
+        # Get the name and the y position of each label
+        label_data <- data
+        # calculate the ANGLE of the labels
+        number_of_bar <- l
+        angle <- 90 - 360 * (label_data$circ_start-0.5) / number_of_bar
+        label_data$hjust <- ifelse(angle < -90, 1, 0)
+        # flip angle BY to make them readable
+        label_data$angle <- ifelse(angle < -90, angle+180, angle)
+        label_data[hjust == 1, "hjust"] <- 0
+        
+        
+        # Prepare a data frame for grid (scales)
+        grid_data <- data.table("start" = 0,
+                                "end" = l)
+        
+        # Calculate position of 5' and 3' labels
+        off <- l*20/1000
+        
+        
+        # Make the plot
+        circ_plot <- ggplot(data, aes(x = start, y = 0)) +
+        
+                    # Add lines
+                    geom_segment(data=grid_data, aes(x = start+4, y = 0, xend = end-4, yend = 0), colour = "darkgrey", alpha=1, size=2.5, inherit.aes = FALSE ) +
+                    geom_segment(data=grid_data, aes(x = end-4, y = 0, xend = end, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) +
+                    geom_segment(data=grid_data, aes(x = start, y = 0, xend = start+4, yend = 0), colour = "black", alpha=1, size=2.5, inherit.aes = FALSE ) + 
+
+                    geom_segment(data=grid_data, aes(x = orf_start, y = 0.1, xend = l, yend = 0.15), colour = "orange", alpha=1, size=1, inherit.aes = FALSE ) + 
+                    geom_segment(data=grid_data, aes(x = 0, y = 0.15, xend = orf_end, yend = 0.2), colour = "darkred", alpha=1, size=1, inherit.aes = FALSE ) +
+    
+                    # Add text
+                    annotate("text", x = 0, y = 0.3, label = "ORF", color="red", size=3, angle=0, fontface="bold", hjust=1) + 
+                    annotate("text", x = c(orf_start-off, orf_end+off), y = c(0.12, 0.22), label = c("5'", "3'"), color = c("orange", "darkred"), size = c(3,3), fontface = c("bold", "bold"), hjust=1) +
+                    annotate("text", x = 20, y = -0.12, label = "bks", color = "black", size = 3, fontface = "bold", hjust=1) +
+                    annotate("text", x = orf_start+(l-orf_start)/2, y = 0.25, label = "nt before bks", color = "orange", size = 3.5, fontface = "bold", hjust=1) +
+                    annotate("text", x = orf_end/2, y = 0.75, label = "nt after bks", color = "darkred", size = 3.5, fontface = "bold", hjust=1) +
+        
+                    ylim(-1, n+1) +
+            
+                    theme_minimal() +
+                    theme(
+                        legend.position = "none",
+                        text = element_text(size=8),
+                        axis.title = element_blank(),
+                        axis.text.x = element_text(angle=0, hjust=1),
+                        axis.text.y = element_text(angle=0, hjust=12.7, vjust=-0.3)
+                      ) +
+        
+                    coord_polar(start = 0)
+        
+
+        print(circ_plot)
+    
+        
+        # Save at png
+        ggsave(circ_plot, file=paste0(output_dir, "circplot_ORF.png"), width=10, height=10, dpi = 600)
+        
+    }
+
+}
+
+```
+
+```{r, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    # all ORFs
+    
+    #"ORFfinder_pred_l":
+    if (ORFfinder_pred_l_circ[, .N] > 0) {
+
+        setkey(ORFfinder_pred_l_circ, circ_id)
+        setkey(gene_names, circ_id)
+        ORFfinder_pred_l_circ <- ORFfinder_pred_l_circ[gene_names, nomatch = 0]
+    
+        setkey(ORFfinder_pred_l_circ, circ_id)
+        setkey(circ_length, circ_id)
+        ORFfinder_pred_l_circ <- ORFfinder_pred_l_circ[circ_length, nomatch = 0]
+    
+        ORFfinder_pred_l_circ$nt_before_bks <- ORFfinder_pred_l_circ$length - ORFfinder_pred_l_circ$start + 1
+        ORFfinder_pred_l_circ$nt_after_bks <- ORFfinder_pred_l_circ$end - ORFfinder_pred_l_circ$length
+    
+        ORFfinder_pred_l_circ <- ORFfinder_pred_l_circ[, c("circ_id", "gene_names", "length", "start", "end", "nt_before_bks", "nt_after_bks", "length_nt", "length_aa")]
+        ORFfinder_pred_l_circ$open <- "F"
+    
+    }
+    
+    
+    #"openORF_l":
+    if (openORF_l_circ[, .N] > 0) {
+    
+        setkey(openORF_l_circ, circ_id)
+        setkey(gene_names, circ_id)
+        openORF_l_circ <- openORF_l_circ[gene_names, nomatch = 0]
+        
+        openORF_l_circ$length_nt <- openORF_l_circ$end - openORF_l_circ$start + 1
+        openORF_l_circ$length_aa <- openORF_l_circ$length_nt / 3
+    
+        setkey(openORF_l_circ, circ_id)
+        setkey(circ_length, circ_id)
+        openORF_l_circ <- openORF_l_circ[circ_length, nomatch = 0]
+    
+        openORF_l_circ$nt_before_bks <- ifelse(openORF_l_circ$start <= openORF_l_circ$length, openORF_l_circ$length - openORF_l_circ$start+1, 2*openORF_l_circ$length - openORF_l_circ$start+1)
+        openORF_l_circ$nt_after_bks <- ifelse(openORF_l_circ$start <= openORF_l_circ$length, openORF_l_circ$end - openORF_l_circ$length, openORF_l_circ$end - 2*openORF_l_circ$length)
+    
+        openORF_l_circ <- openORF_l_circ[, c("circ_id", "gene_names", "length", "start", "end", "nt_before_bks", "nt_after_bks", "length_nt", "length_aa", "open")]
+    
+    }
+    
+    
+    #"ORFfinder_pred_l" and "openORF_l":
+    if ((ORFfinder_pred_l_circ[, .N] > 0) & (openORF_l_circ[, .N] > 0)) {
+    
+        ORF_pred_circ <- rbind(ORFfinder_pred_l_circ, openORF_l_circ)
+        ORF_pred_circ$open <- factor(ORF_pred_circ$open, levels = c("T", "F"))
+    
+    } else {
+    
+        if (ORFfinder_pred_l_circ[, .N] > 0) {
+    
+            ORF_pred_circ <- ORFfinder_pred_l_circ
+            ORF_pred_circ$open <- factor(ORF_pred_circ$open, levels = c("T", "F"))
+    
+        } else {
+    
+            if (openORF_l_circ[, .N] > 0) {
+    
+                ORF_pred_circ <- openORF_l_circ
+                ORF_pred_circ$open <- factor(ORF_pred_circ$open, levels = c("T", "F"))
+    
+            } else {
+    
+                ORF_pred_circ <- data.table()
+                #print("No predicted ORFs")
+    
+            }
+        }
+    }
+    
+    
+    if (ORF_pred_circ[, .N] > 0) {
+    
+        ORF_pred_circ$gene_names <- paste0("<a href=\"", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=", ORF_pred_circ$gene_names, "\" target=\"_blank\">", ORF_pred_circ$gene_names, "</a>")
+        
+        ORF_pred_circ[open == "F",]$open <- "with stop codon"
+        ORF_pred_circ[open == "T",]$open <- "without stop codon"
+    
+        ORF_pred_circ$aa_before_bks <- round(ORF_pred_circ$nt_before_bks /3, 1)
+        ORF_pred_circ$aa_after_bks <- round(ORF_pred_circ$nt_after_bks /3, 1)
+        ORF_pred_circ$inframe <- ifelse(ORF_pred_circ$nt_before_bks%%3 == 0, "T", "F")
+    
+    }
+    
+    
+    if (ORF_pred_circ[, .N] > 0) {
+    
+        ORF_pred_circ$circ_start_end <- paste0(ORF_pred_circ$circ_id, "_", ORF_pred_circ$start, "_", ORF_pred_circ$end)
+    
+        
+        # intersection with sequence nt
+        colnames(list_CDS) <- c("circ_start_end", "sequence_nt")
+        
+        setkey(ORF_pred_circ, circ_start_end)
+        setkey(list_CDS, circ_start_end)
+        ORF_pred_circ <- merge(ORF_pred_circ, list_CDS, all.x=TRUE)
+    
+        
+        # intersection with sequence aa
+        colnames(list_ORF) <- c("circ_start_end", "sequence_aa")
+        
+        setkey(ORF_pred_circ, circ_start_end)
+        setkey(list_ORF, circ_start_end)
+        ORF_pred_circ <- merge(ORF_pred_circ, list_ORF, all.x=TRUE)
+        
+        
+        ORF_pred_circ <- ORF_pred_circ[, -"circ_start_end"]
+        
+    }
+
+}
+
+```
+
+```{r print_15, echo=FALSE, include=FALSE}
+
+print_15 <- ""
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+    
+    #if (ORF_pred_circ[, .N] > 0) {
+    
+        print_15 <- paste0("Number of detected ORFs: ", ORF_pred_circ[, .N])
+
+    #}
+    
+}
+
+```
+
+`r print_15`
+
+```{r table_ORF, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+    
+    if (ORF_pred_circ[, .N] > 0) {
+    
+        dt5 <- ORF_pred_circ[, c(1,2,8,9,10,13,3,4,5,6,11,7,12,14,15)]   # change column order
+    
+    #} else {
+    
+        # print empty datatable
+        #dt5 <- data.table("circ_id" = character(), "gene_names" = character(), "length_nt" = numeric(), "length_aa" = numeric(), "open" = character(), "inframe" = character(), "length" = numeric(), "start" = numeric(), "end" = numeric(), "nt_before_bks" = numeric(), "aa_before_bks" = numeric(), "nt_after_bks" = numeric(),"aa_after_bks" = numeric(), "sequence_nt" = character(), "sequence_aa" = character())
+    
+    #}
+    
+    
+    table5 <- datatable(data = dt5,
+                  rownames = F,
+                  colnames = c("CircRNA", "Gene name", "ORF length (nt)", "ORF length (aa)", "ORF", "Inframe (T/F)", "CircRNA length (nt)", "ORF start", "ORF end", "nt before bks", "aa before bks", "nt after bks", "aa after bks", "Sequence (nt)", "Sequence (aa)"),
+                  style = "bootstrap",
+                  class = "compact display",
+                  caption = paste0("Predicted Open Reading Frames crossing the backsplice junction (bks). \"ORF\", \"nt before bks\" and \"nt after bks\": as detailed before; \"aa before bks\" and \"aa after bks\": amino acid sequence correspondent to \"nt before bks\" and \"nt after bks\", respectively. \"ORF start\" and \"ORF end\" positions are relative to circRNA sequence."),
+    	          fillContainer = F,
+                  autoHideNavigation = T,
+                  filter = "top",
+                  escape = FALSE,
+                  extensions = c('ColReorder', 'Buttons', 'KeyTable'),
+                  options = list(colReorder = TRUE,
+                                 searching = TRUE,
+                                 pageLength = 10,
+                                 dom = 'Bfrtip',
+                                 buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                 keys = TRUE
+                                )
+                 ) %>%
+    	formatStyle('open',
+                	target = "row",
+                	backgroundColor = styleEqual(c("without stop codon", "with stop codon"), c('lightgray', 'lightblue'))
+                )
+    
+    table5
+
+    }
+    
+}
+
+```
+
+```{r, echo=FALSE, include=TRUE}
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+
+    if (ORF_pred_circ[, .N] > 0) {
+        
+        dt5$circ_start_end <- paste0(dt5$circ_id, "_", dt5$start, "_", dt5$end)
+        
+        #Save table
+        write.table(dt5, paste0(output_dir, "Predicted_ORF.txt"), sep = "\t", row.names = F, quote = F, dec = ",")
+
+                
+        # create .fa file for sequence nt
+        cmd1 <- paste0("cat ", paste0(output_dir, "Predicted_ORF.txt"), " | grep -v \"circ_id\" | cut -f16 > ", paste0(output_dir, "c.txt"))
+        system(cmd1)
+        cmd2 <- paste0("cat ", paste0(output_dir, "Predicted_ORF.txt"), " | grep -v \"circ_id\" | cut -f14 > ", paste0(output_dir, "nt.txt"))
+        system(cmd2)
+        cmd3 <- paste0("paste ", paste0(output_dir, "c.txt"), " ", paste0(output_dir, "nt.txt"), " | sed -e 's/^/>/; s/\t/\\n/' > ", paste0(output_dir, "ORF_nt_sequence.fa"))
+        system(cmd3)
+
+                
+        # create .fa file for sequence aa
+        cmd4 <- paste0("cat ", paste0(output_dir, "Predicted_ORF.txt"), " | grep -v \"circ_id\" | cut -f16 > ", paste0(output_dir, "c.txt"))
+        system(cmd4)
+        cmd5 <- paste0("cat ", paste0(output_dir, "Predicted_ORF.txt"), " | grep -v \"circ_id\" | cut -f15 > ", paste0(output_dir, "aa.txt"))
+        system(cmd5)
+        cmd6 <- paste0("paste ", paste0(output_dir, "c.txt"), " ", paste0(output_dir, "aa.txt"), " | sed -e 's/^/>/; s/\t/\\n/' > ", paste0(output_dir, "ORF_aa_sequence.fa"))
+        system(cmd6)
+
+                
+        # remove intermediary files
+        cmd7 <- paste0("rm ", paste0(output_dir, "c.txt"), " ", paste0(output_dir, "nt.txt"), " ", paste0(output_dir, "aa.txt"), " ", paste0(output_dir, "Predicted_ORF.txt"))
+        system(cmd7)
+        
+    }
+
+}
+
+```
+
+```{r print_16, echo=FALSE, include=FALSE}
+
+print_16 <- ""
+
+if (parameters[1] == "O" | parameters[1] == "MO" | parameters[1] == "RO" | parameters[1] == "MRO") {
+    
+    if (ORF_pred_circ[, .N] > 0) {
+    		    
+        print_16 <- "The nucleotide and amino acid ORF sequences are saved in \"ORF_nt_sequence.fa\" and \"ORF_aa_sequence.fa\", respectively. Sequence header is in the form \">circId_ORFstart_ORFend\"."
+        
+    }
+
+}
+
+```
+
+`r print_16`
+
+
+
+
+
+# Session info
+
+This page was generated with the following packages version:
+
+```{r session, echo=FALSE}
+
+sessionInfo()
+
+```
+
+
