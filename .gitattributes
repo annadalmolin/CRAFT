@@ -1,0 +1,5 @@
+*.gitignore linguist-detectable=false
+*.bed linguist-detectable=false
+*.md linguist-detectable=false
+*.yml linguist-detectable=false
+*.txt linguist-detectable=false
