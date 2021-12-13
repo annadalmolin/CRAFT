@@ -3,3 +3,5 @@
 *.md linguist-detectable=false
 *.yml linguist-detectable=false
 *.txt linguist-detectable=false
+
+*.Rmd linguist-detectable=true
