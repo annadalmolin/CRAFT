@@ -188,3 +188,11 @@ If circRNA sequences are available to the user, CRAFT doesn’t perform the sequ
 
 - Functional enrichments on validated target genes of miRNAs with predicted binding sites in circRNA sequences can be performed only for _Homo sapiens_ (hsa), _Mus musculus_ (mmu) and _Rattus norvegicus_ (rno) species.
 - The output clearness and intelligibility improve at the growing of filtering stringency; f.i., if a figure is not understandable or CRAFT crashes due to too many predictions, simply re-run the graphical part of the analysis increasing CRAFT stringency.
+
+
+## How to cite
+
+If you use CRAFT for your analysis, please add the following citation to your references:
+
+_Dal Molin A, Gaffo E, Difilippo V, Buratin A, Tretti Parenzan C, Bresolin S, Bortoluzzi S, CRAFT: a bioinformatics software for custom prediction of circular RNA functions, Brief Bioinform. 2022 Mar 10;23(2):bbab601._
+
