@@ -151,10 +151,10 @@ After CRAFT successful run end, you will find the following new directories in y
 		- _backsplice_sequence_per_ORF_MIN_LENGTH.fa_: the sequence used for ORF prediction (with minimal length of the ORF = _MIN_LENGTH_), obtained doubling circRNA sequence twice
 		- _ORFfinder/_:
 			- _result_list_ORF_MIN_LENGTH.txt, result_list_CDS_MIN_LENGTH.txt, result_text_ORF_MIN_LENGTH.txt, result_table_ORF_MIN_LENGTH.txt, ORF0_MIN_LENGTH.log, ORF1_MIN_LENGTH.log, ORF2_MIN_LENGTH.log, ORF3_MIN_LENGTH.log, ORF0_MIN_LENGTH.perf, ORF1_MIN_LENGTH.perf, ORF2_MIN_LENGTH.perf, ORF3_MIN_LENGTH.perf_: original output of ORFfinder (with minimal length of the ORF = _MIN_LENGTH_)
-			- __*ORF_backsplice.txt*__ and __*ORF_backsplice0.txt*__: final output of ORFfinder (list of ORF detected), respectively with ORF start position in 1-based and in 0-based format
+			- __*ORF_backsplice.txt*__ and __*ORF_backsplice0.txt*__: final output of ORFfinder (list of ORF detected crossing the backsplice junction), respectively with ORF start position in 1-based and in 0-based format
 			- __*ORF_backsplice_open.txt*__ and __*ORF_backsplice_open0.txt*__: final output of ORFfinder (list of rolling ORF detected), respectively with ORF start position in 1-based and in 0-based format
-			- __*result_list_CDS.fa*__ and _result_list_CDS.txt_: nucleotidic ORF sequence, respectively in FASTA and TXT format
-			- __*result_list_ORF.fa*__ and _result_list_ORF.txt_: amino acid ORF sequence, respectively in FASTA and TXT format
+			- __*result_list_CDS.fa*__ and _result_list_CDS.txt_: nucleotidic sequence of all detected ORF, respectively in FASTA and TXT format
+			- __*result_list_ORF.fa*__ and _result_list_ORF.txt_: amino acid sequence of all detected ORF, respectively in FASTA and TXT format
 
 - __graphical_output/__
 
